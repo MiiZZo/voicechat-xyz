@@ -45,7 +45,11 @@
 ### 3.3. LiveKit-сервер
 - Внешний бинарник в Docker-контейнере (`livekit/livekit-server`)
 - Никакого нашего кода, только конфигурация и API-ключи
-- WSS на 7880, RTC UDP на 7881–7882, TURN на 443/TCP для строгих firewall
+- Порты:
+  - 7880/TCP — WSS-сигналинг, проксируется через Caddy на 443/TCP
+  - 7881/TCP — TCP fallback для медиа (для клиентов за строгим UDP-блокирующим firewall)
+  - 7882/UDP — основной RTC-транспорт
+- TURN/TLS на 443/TCP **не используется** на этом этапе — он бы конфликтовал с Caddy на том же порту. Если понадобится в будущем — выделить отдельный IP/субдомен или выбрать порт типа 5349. Сейчас встроенного UDP/7882 + TCP fallback/7881 достаточно для подавляющего большинства сетей.
 
 ### 3.4. Развёртывание
 - Одна VPS Hetzner CPX21 (€8/мес, 3 vCPU, 4 ГБ RAM, 20 ТБ исходящего трафика)
@@ -89,18 +93,25 @@ const MAX_PARTICIPANTS = 8; // глобальная константа
 Реализация: для каждой комнаты вызывает `RoomServiceClient.listParticipants(roomId)`. Кэш на уровне сервера — 1 секунда — чтобы поллинг от 8 клиентов не дудосил LiveKit (8 × N комнат запросов в секунду превращается в ≤ N запросов в секунду).
 
 #### `POST /api/join`
-Body: `{ roomId: string, displayName: string }` (валидация zod: `displayName` 1–32 символа, не пустой trim).
+Body: `{ roomId: string, displayName: string }`.
+
+Валидация zod для `displayName`:
+- 1–32 символа после trim
+- Запрещены: символ `#` (разделитель в identity), управляющие символы (`\x00-\x1F\x7F`), Unicode bidi-overrides (`‪-‮`, `⁦-⁩`)
+- Разрешены: буквы любого алфавита, цифры, пробелы, дефисы, подчёркивания, точки
 
 Возвращает:
 - `200 { token: string, livekitUrl: string, identity: string }`
 - `400` — невалидный displayName
 - `404` — `roomId` нет в текущем `rooms.yaml`
 - `409 { reason: "full" }` — в комнате уже 8 участников
-- `409 { reason: "duplicate_name" }` — `displayName` уже занят в этой комнате (проверяется через `listParticipants`)
+- `409 { reason: "duplicate_name" }` — `displayName` уже занят в этой комнате
 
-Identity формируется как `{displayName}#{random4hex}`, чтобы избежать race-condition при одновременном входе двух одинаковых ников (короткое окно между проверкой `listParticipants` и фактическим коннектом).
+Проверки `full` и `duplicate_name` вызывают `RoomServiceClient.listParticipants(roomId)` **минуя кэш `GET /api/rooms`**: это критическая проверка, мы должны видеть актуальное состояние, а не данные секундной давности. Race condition (одновременный коннект двух пользователей с одинаковым ником в одну секунду) допустим — `random4hex` суффикс гарантирует уникальность LiveKit identity, а второй пользователь увидит первого после коннекта.
 
-JWT-гранты: `roomJoin: true`, `room: roomId`, `canPublish: true`, `canSubscribe: true`. TTL — 6 часов.
+Identity формируется как `{displayName}#{random4hex}`. В UI показывается только `displayName`, суффикс — внутренний идентификатор.
+
+JWT-гранты: `roomJoin: true`, `room: roomId`, `canPublish: true`, `canSubscribe: true`. TTL — **24 часа** (длинных сессий >6 ч хватит, не придётся думать о token refresh; перевыпуск токена за пределами 24ч непринципиален — пользователь rejoin'ится).
 
 #### `GET /healthz`
 Возвращает `200 { status: "ok" }` для health-проверок.
@@ -127,6 +138,8 @@ rooms:
 3. При ошибке — оставляем старое состояние, пишем `error`-лог. Не падаем.
 
 Удалённые из YAML комнаты остаются в LiveKit, пока их участники не выйдут. Новых клиентов туда сервер не пускает (`POST /api/join` → 404).
+
+In-flight `POST /api/join` запросы, начавшие обработку до перезагрузки конфига, завершаются успешно — проверка `roomId in rooms` делается на входе в обработчик, последующая выдача токена не повторяет проверку.
 
 ### 4.6. Конфигурация
 
@@ -201,6 +214,7 @@ view: "lobby" | "room"
 - Select микрофона (`navigator.mediaDevices.enumerateDevices()`)
 - Select камеры
 - Select динамиков (применяется через `audioElement.setSinkId(deviceId)`)
+- Списки устройств подписаны на `navigator.mediaDevices.devicechange` — при подключении/отключении USB-устройства селекты обновляются автоматически. Если активное устройство пропало — fallback на default + тост (см. таблицу ошибок 6.5)
 - Чекбоксы:
   - `echoCancellation`
   - `noiseSuppression`
@@ -228,8 +242,13 @@ view: "lobby" | "room"
 
 Electron не показывает встроенный picker для `getDisplayMedia()` — нужен кастомный.
 
+Состояния кнопки «Демонстрация»:
+- **Idle** (нет screen-share в комнате): «Начать демонстрацию», активна
+- **Local sharing** (текущий пользователь шарит): «Остановить демонстрацию», активна, выделена
+- **Remote sharing** (кто-то другой шарит): disabled, тултип «{ник} уже демонстрирует экран»
+
 Поток:
-1. Кнопка «Демонстрация» disabled, если в `room.remoteParticipants` уже есть screen-share track
+1. Кнопка disabled, если в `room.remoteParticipants` уже есть screen-share track. Если local — кнопка переключается в «Stop»
 2. Клик → IPC `get-screen-sources` → main вызывает `desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 320, height: 180 } })`
 3. Renderer показывает кастомный picker (модалка с миниатюрами)
 4. После выбора:
@@ -273,7 +292,7 @@ type Prefs = {
     autoGainControl: boolean;
   };
   pushToTalk: { enabled: boolean; key: string };
-  participantVolumes: Record<string, number>; // by identity prefix (без random suffix)
+  participantVolumes: Record<string, number>; // ключ — displayName (без random suffix); это означает, что разные участники с одинаковым ником в разное время будут наследовать одно значение громкости — допустимый компромисс
 };
 ```
 
@@ -332,6 +351,9 @@ type Prefs = {
 |---|---|
 | `RoomEvent.Disconnected` (`reason: ServerShutdown`) | Возврат в lobby, тост «Сервер перезапущен» |
 | `RoomEvent.Disconnected` (`reason: DuplicateIdentity`) | Возврат в lobby, тост «Подключение из другого окна» |
+| `RoomEvent.Disconnected` (`reason: ParticipantRemoved` / `RoomDeleted`) | Возврат в lobby, тост «Вы были отключены от комнаты» |
+| `RoomEvent.Disconnected` (`reason: ClientInitiated`) | Тихо — это наш `room.disconnect()` |
+| `RoomEvent.Disconnected` (любая другая причина) | Возврат в lobby, тост «Связь потеряна» |
 | `MediaDeviceFailure` — микрофон занят | Тост «Микрофон занят», иконка перечёркнута |
 | `getDisplayMedia` reject (cancel в picker) | Тихо игнорируем |
 | `PublishTrackError` для screen share | Тост с конкретной ошибкой |
@@ -405,7 +427,8 @@ GitHub Actions:
 
 ### 7.5. Переменные окружения клиента
 
-- `VITE_LOBBY_URL` (например, `https://chat.example.com`) — встраивается в сборку Vite. Поменять = пересобрать. Это нормально для одно-инстансной инсталляции.
+- `VITE_LOBBY_URL` (например, `https://chat.example.com`) — единственное, что встраивается в сборку Vite. Поменять = пересобрать. Это нормально для одно-инстансной инсталляции.
+- LiveKit URL **не вшивается в клиент** — Lobby-сервер возвращает его в payload `POST /api/join` (поле `livekitUrl`). Это позволяет переключить медиасервер без релиза клиента.
 
 ### 7.6. Деплой-чеклист (для README.md в `deploy/`)
 
