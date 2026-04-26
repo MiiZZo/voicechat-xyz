@@ -221,8 +221,9 @@ view: "lobby" | "room"
   - `autoGainControl`
 - Push-to-talk:
   - Toggle вкл/выкл
-  - Capture хоткея (по умолчанию: `Space`, удерживать)
+  - Capture хоткея (по умолчанию: правый `Alt`, удерживать)
   - Hotkey работает **только когда окно в фокусе** (без global hotkey — это лишний нативный модуль и риск)
+  - PTT-обработчик игнорирует событие, если фокус находится в редактируемом элементе (`input`, `textarea`, `[contenteditable]`) — иначе пользователь, печатающий в чате, случайно триггерит микрофон
 
 ### 5.3. Поток входа в комнату
 
@@ -233,8 +234,8 @@ view: "lobby" | "room"
 4. on 200 → save token + livekitUrl in zustand
 5. <LiveKitRoom token={...} serverUrl={...}> connects via WSS
 6. on RoomEvent.Connected:
-   - publish mic track with saved deviceId + audioConstraints
-   - publish camera track if last state was "camera on"
+   - publish mic track if `prefs.initialDeviceState.mic`, with saved deviceId + audioConstraints
+   - publish camera track if `prefs.initialDeviceState.camera`
 7. switch view: "lobby" → "room"
 ```
 
@@ -293,10 +294,11 @@ type Prefs = {
   };
   pushToTalk: { enabled: boolean; key: string };
   participantVolumes: Record<string, number>; // ключ — displayName (без random suffix); это означает, что разные участники с одинаковым ником в разное время будут наследовать одно значение громкости — допустимый компромисс
+  initialDeviceState: { mic: boolean; camera: boolean }; // дефолты при заходе в новую комнату
 };
 ```
 
-Дефолты: все три audioConstraints = `true`, PTT off, ник = `os.userInfo().username` при первом запуске.
+Дефолты при первом запуске: ник = `os.userInfo().username`, все audioConstraints = `true`, PTT off, `initialDeviceState = { mic: true, camera: false }` (микрофон включён, камера выключена — самый предсказуемый сценарий первого звонка). При выходе из комнаты `initialDeviceState` обновляется текущим состоянием mic/camera, чтобы следующий заход открывался в том же режиме.
 
 ### 5.7. Auto-update
 
@@ -385,9 +387,10 @@ type Prefs = {
 - `Caddyfile`:
   - `chat.example.com → lobby-server:3000`
   - `livekit.example.com → livekit:7880` (с поддержкой WS upgrade)
-- LiveKit-конфиг:
-  - TURN на 443/TCP включён (для строгих корпоративных firewall)
-  - Встроенный TURN, отдельный coturn не нужен
+- LiveKit-конфиг (см. также Section 3.3):
+  - TURN/TLS на 443/TCP **отключён** на этом этапе из-за конфликта с Caddy
+  - Транспорты медиа: UDP/7882 + TCP fallback/7881
+  - Встроенный TURN внутри LiveKit, отдельный coturn не нужен
 - Логи в stdout, ротация через docker logging driver
 
 ### 7.3. Структура репозитория
@@ -432,7 +435,7 @@ GitHub Actions:
 
 ### 7.6. Деплой-чеклист (для README.md в `deploy/`)
 
-1. Поднять VPS, открыть порты 80/443/TCP, 7881–7882/UDP
+1. Поднять VPS, открыть порты: 80/TCP, 443/TCP, 7881/TCP (TCP fallback для медиа), 7882/UDP (основной RTC)
 2. Указать DNS A-запись на IP
 3. `git clone`, заполнить `.env`
 4. `docker compose up -d`
