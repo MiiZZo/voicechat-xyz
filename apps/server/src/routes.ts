@@ -14,7 +14,12 @@ export type RouteDeps = {
   tokens: TokenIssuer;
 };
 
-export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Promise<void> {
+// Erase all four generics so we accept FastifyInstance<any logger> without variance issues.
+// Concrete generic shape: FastifyInstance<RawServer, RawRequest, RawReply, Logger>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyFastify = FastifyInstance<any, any, any, any>;
+
+export async function registerRoutes(app: AnyFastify, deps: RouteDeps): Promise<void> {
   app.get('/healthz', async () => ({ status: 'ok' }));
 
   app.get('/api/rooms', async () => {

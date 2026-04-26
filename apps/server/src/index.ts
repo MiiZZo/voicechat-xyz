@@ -1,4 +1,4 @@
-import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
+import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { loadConfig } from './config.js';
 import { logger } from './logger.js';
@@ -14,10 +14,7 @@ await rooms.start();
 const livekit = new LiveKitClient(config);
 const tokens = TokenIssuer.fromConfig(config);
 
-// Cast: passing a pino instance narrows Fastify's logger generic in a way that
-// breaks plugin compatibility; widening back to FastifyBaseLogger keeps the
-// instance API consistent across the rest of the app.
-const app = Fastify({ logger: logger as unknown as FastifyBaseLogger }) as FastifyInstance;
+const app = Fastify({ logger });
 await app.register(cors, { origin: true });
 await registerRoutes(app, { config, rooms, livekit, tokens });
 
