@@ -227,10 +227,10 @@ git commit -m "chore: add root README and ESLint flat config"
 
 - [ ] **Step 3: Create stub `apps/server/src/index.ts`**
 
-```ts
-import { logger } from './logger.js';
+This is a placeholder; we'll add the logger and routes in subsequent tasks. No imports yet.
 
-logger.info('voicechat server starting...');
+```ts
+console.log('voicechat server starting...');
 ```
 
 - [ ] **Step 4: Install workspace deps**
@@ -789,10 +789,15 @@ git commit -m "feat(server): /api/rooms and /api/join endpoints"
 
 - [ ] **Step 4: Create `apps/client/electron.vite.config.ts`**
 
+Note: `__dirname` is not available in ESM modules. Use `import.meta.url`.
+
 ```ts
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { defineConfig } from 'electron-vite';
 import react from '@vitejs/plugin-react';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   main: { build: { outDir: 'out/main' } },
@@ -1628,20 +1633,41 @@ git commit -m "feat(client): lobby view with polling and join flow"
 ```ts
 import { useEffect, useState } from 'react';
 import {
+  ConnectionState,
+  DisconnectReason,
   Room,
   RoomEvent,
-  Track,
-  type ConnectionState,
-  type DisconnectReason,
 } from 'livekit-client';
 import { useStore } from '../state/store.js';
 import { useToasts } from '../state/toast-store.js';
+
+/** Map DisconnectReason enum → user-facing message. `null` = silent. */
+function describeDisconnect(reason: DisconnectReason | undefined): string | null {
+  switch (reason) {
+    case DisconnectReason.CLIENT_INITIATED:
+      return null; // we initiated room.disconnect() on leave
+    case DisconnectReason.DUPLICATE_IDENTITY:
+      return 'Подключение из другого окна';
+    case DisconnectReason.SERVER_SHUTDOWN:
+      return 'Сервер перезапущен';
+    case DisconnectReason.PARTICIPANT_REMOVED:
+    case DisconnectReason.ROOM_DELETED:
+      return 'Вы были отключены от комнаты';
+    case undefined:
+      return null;
+    default:
+      return 'Связь потеряна';
+  }
+}
+
+export type MicPermissionState = 'unknown' | 'granted' | 'denied';
 
 export function useLiveKitRoom() {
   const { activeRoom, prefs, leaveRoom } = useStore();
   const { push } = useToasts();
   const [room, setRoom] = useState<Room | null>(null);
-  const [state, setState] = useState<ConnectionState>('disconnected' as ConnectionState);
+  const [state, setState] = useState<ConnectionState>(ConnectionState.Disconnected);
+  const [micPermission, setMicPermission] = useState<MicPermissionState>('unknown');
 
   useEffect(() => {
     if (!activeRoom || !prefs) return;
@@ -1661,24 +1687,67 @@ export function useLiveKitRoom() {
 
     r.on(RoomEvent.ConnectionStateChanged, setState);
     r.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
-      const reasonMap: Record<number, string> = {
-        1: 'Подключение из другого окна',
-        2: 'Сервер перезапущен',
-        3: 'Вы были отключены от комнаты',
-        4: 'Связь потеряна',
-      };
-      const code = reason ?? 0;
-      const msg = code === 0 ? null : reasonMap[code] ?? 'Связь потеряна';
+      const msg = describeDisconnect(reason);
       if (msg) push('error', msg);
       leaveRoom();
     });
 
+    /** Try to enable a device; if it fails (permission, missing), recover gracefully. */
+    const tryEnable = async (
+      kind: 'mic' | 'camera',
+      enable: () => Promise<unknown>,
+    ): Promise<boolean> => {
+      try {
+        await enable();
+        return true;
+      } catch (err) {
+        const e = err as Error;
+        const denied = /permission|notallowed/i.test(e.name) || /permission/i.test(e.message);
+        const notFound = /notfound|devicenotfound/i.test(e.name);
+        if (kind === 'mic') {
+          if (denied) {
+            setMicPermission('denied');
+            push('error', 'Микрофон недоступен — проверьте настройки Windows');
+          } else if (notFound) {
+            push('info', 'Использую микрофон по умолчанию');
+            // Retry once with default device
+            try {
+              await r.localParticipant.setMicrophoneEnabled(true, { deviceId: undefined });
+              return true;
+            } catch {
+              /* give up */
+            }
+          } else {
+            push('error', `Микрофон: ${e.message}`);
+          }
+        } else {
+          if (denied) push('error', 'Камера недоступна');
+          else if (notFound) push('info', 'Камера не найдена');
+          else push('error', `Камера: ${e.message}`);
+        }
+        return false;
+      }
+    };
+
     (async () => {
       try {
         await r.connect(activeRoom.join.livekitUrl, activeRoom.join.token);
-        if (prefs.initialDeviceState.mic) await r.localParticipant.setMicrophoneEnabled(true);
-        if (prefs.initialDeviceState.camera) await r.localParticipant.setCameraEnabled(true);
         setRoom(r);
+        if (prefs.initialDeviceState.mic) {
+          const ok = await tryEnable('mic', () =>
+            r.localParticipant.setMicrophoneEnabled(true, {
+              deviceId: prefs.audioInputDeviceId ?? undefined,
+            }),
+          );
+          if (ok) setMicPermission('granted');
+        }
+        if (prefs.initialDeviceState.camera) {
+          await tryEnable('camera', () =>
+            r.localParticipant.setCameraEnabled(true, {
+              deviceId: prefs.videoInputDeviceId ?? undefined,
+            }),
+          );
+        }
       } catch (err) {
         push('error', `Не удалось подключиться: ${(err as Error).message}`);
         leaveRoom();
@@ -1691,32 +1760,91 @@ export function useLiveKitRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRoom?.roomId]);
 
-  return { room, state };
+  return { room, state, micPermission };
 }
 ```
 
 - [ ] **Step 2: Create `apps/client/src/renderer/components/ParticipantTile.tsx`**
 
+Subscribes to `ParticipantEvent` to re-attach video when tracks publish/unpublish/mute. Re-attach on `videoSource` selector toggles between Camera and ScreenShare.
+
 ```tsx
-import { useEffect, useRef } from 'react';
-import { Track, type Participant } from 'livekit-client';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ParticipantEvent,
+  Track,
+  type Participant,
+  type TrackPublication,
+} from 'livekit-client';
 import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { cn } from '../lib/cn.js';
+import { useStore } from '../state/store.js';
 
-export function ParticipantTile({ p, big = false }: { p: Participant; big?: boolean }) {
+type Props = {
+  p: Participant;
+  big?: boolean;
+  videoSource?: Track.Source; // default: Camera
+};
+
+export function ParticipantTile({ p, big = false, videoSource = Track.Source.Camera }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { prefs } = useStore();
+  const [, force] = useState(0);
+  const rerender = () => force((n) => n + 1);
 
+  // Subscribe to participant track changes to trigger re-attach + UI updates
   useEffect(() => {
-    const cam = p.getTrackPublication(Track.Source.Camera);
-    if (cam?.track && videoRef.current) cam.track.attach(videoRef.current);
-    return () => {
-      if (cam?.track && videoRef.current) cam.track.detach(videoRef.current);
-    };
-  }, [p, p.trackPublications.size]);
+    const events: ParticipantEvent[] = [
+      ParticipantEvent.TrackPublished,
+      ParticipantEvent.TrackUnpublished,
+      ParticipantEvent.TrackSubscribed,
+      ParticipantEvent.TrackUnsubscribed,
+      ParticipantEvent.TrackMuted,
+      ParticipantEvent.TrackUnmuted,
+      ParticipantEvent.IsSpeakingChanged,
+    ];
+    events.forEach((e) => p.on(e, rerender));
+    return () => events.forEach((e) => p.off(e, rerender));
+  }, [p]);
+
+  // Attach video track
+  useEffect(() => {
+    const pub: TrackPublication | undefined = p.getTrackPublication(videoSource);
+    const el = videoRef.current;
+    if (pub?.track && el && !pub.isMuted) {
+      pub.track.attach(el);
+      return () => {
+        pub.track?.detach(el);
+      };
+    }
+  });
+
+  // Attach remote audio (local participant doesn't need attach)
+  useEffect(() => {
+    if (p.isLocal) return;
+    const pub = p.getTrackPublication(Track.Source.Microphone);
+    const el = audioRef.current;
+    if (pub?.track && el) {
+      pub.track.attach(el);
+      // Apply persisted volume + output device
+      const persistedVol = prefs?.participantVolumes[p.name ?? p.identity];
+      if (typeof persistedVol === 'number') el.volume = persistedVol;
+      if (prefs?.audioOutputDeviceId && 'setSinkId' in HTMLMediaElement.prototype) {
+        (el as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> })
+          .setSinkId(prefs.audioOutputDeviceId)
+          .catch(() => undefined);
+      }
+      return () => {
+        pub.track?.detach(el);
+      };
+    }
+  });
 
   const micPub = p.getTrackPublication(Track.Source.Microphone);
-  const camPub = p.getTrackPublication(Track.Source.Camera);
+  const camPub = p.getTrackPublication(videoSource);
   const speaking = p.isSpeaking;
+  const showVideo = camPub && !camPub.isMuted;
 
   return (
     <div
@@ -1726,14 +1854,21 @@ export function ParticipantTile({ p, big = false }: { p: Participant; big?: bool
         big && 'col-span-2 row-span-2',
       )}
     >
-      {camPub && !camPub.isMuted ? (
-        <video ref={videoRef} className="h-full w-full rounded-lg object-cover" autoPlay playsInline />
+      {showVideo ? (
+        <video
+          ref={videoRef}
+          className="h-full w-full rounded-lg object-cover"
+          autoPlay
+          playsInline
+          muted={p.isLocal}
+        />
       ) : (
         <div className="text-2xl font-semibold text-zinc-500">{p.name?.[0] ?? '?'}</div>
       )}
+      {!p.isLocal && <audio ref={audioRef} autoPlay />}
       <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-xs">
-        {micPub?.isMuted ? <MicOff size={12} /> : <Mic size={12} />}
-        {camPub?.isMuted ? <VideoOff size={12} /> : <Video size={12} />}
+        {!micPub || micPub.isMuted ? <MicOff size={12} /> : <Mic size={12} />}
+        {!camPub || camPub.isMuted ? <VideoOff size={12} /> : <Video size={12} />}
         <span>{p.name}</span>
       </div>
     </div>
@@ -2171,6 +2306,274 @@ git commit -m "feat(client): text chat via LiveKit data channels"
 
 ---
 
+## Chunk 8.5: Mic level indicator, volume popup, PTT indicator
+
+These three small features are referenced in spec sections 5.2 and 5.6.
+
+### Task 8.5.1: Mic-level indicator
+
+**Files:**
+- Create: `apps/client/src/renderer/hooks/useMicLevel.ts`
+- Modify: `apps/client/src/renderer/components/ControlBar.tsx`
+
+- [ ] **Step 1: Create hook**
+
+```ts
+import { useEffect, useState } from 'react';
+import { Track, type Room } from 'livekit-client';
+
+/** Returns RMS level 0..1 of the local microphone track, sampled ~10x/sec. */
+export function useMicLevel(room: Room | null): number {
+  const [level, setLevel] = useState(0);
+
+  useEffect(() => {
+    if (!room) return;
+    const pub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+    const track = pub?.audioTrack;
+    const stream = track?.mediaStream;
+    if (!stream) {
+      setLevel(0);
+      return;
+    }
+    const ctx = new AudioContext();
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    const source = ctx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    let raf = 0;
+    let last = 0;
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      if (now - last < 100) return;
+      last = now;
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) {
+        const x = (data[i]! - 128) / 128;
+        sum += x * x;
+      }
+      setLevel(Math.min(1, Math.sqrt(sum / data.length) * 2));
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      source.disconnect();
+      ctx.close().catch(() => undefined);
+    };
+  }, [room, room?.localParticipant.isMicrophoneEnabled]);
+
+  return level;
+}
+```
+
+- [ ] **Step 2: Render bars in ControlBar**
+
+In `ControlBar.tsx`, accept `level: number` prop and render a 5-segment LED-bar:
+
+```tsx
+type Props = {
+  /* existing... */
+  level: number;
+};
+
+// before the close </div>:
+<div className="ml-3 flex items-center gap-0.5">
+  {[0.1, 0.25, 0.45, 0.65, 0.85].map((thr, i) => (
+    <span
+      key={i}
+      className={cn(
+        'h-3 w-1 rounded-sm transition',
+        level > thr ? 'bg-emerald-500' : 'bg-zinc-800',
+      )}
+    />
+  ))}
+</div>
+```
+
+- [ ] **Step 3: Wire from `RoomView.tsx`**
+
+```tsx
+import { useMicLevel } from '../hooks/useMicLevel.js';
+const level = useMicLevel(room);
+// pass to ControlBar: <ControlBar ... level={level} />
+```
+
+- [ ] **Step 4: Manual verify**
+
+In room, speak — bars light up green. Mute mic — bars stay dark.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .
+git commit -m "feat(client): mic-level indicator in control bar"
+```
+
+### Task 8.5.2: Per-participant volume popup
+
+**Files:**
+- Create: `apps/client/src/renderer/components/VolumePopover.tsx`
+- Modify: `apps/client/src/renderer/components/ParticipantTile.tsx`
+
+- [ ] **Step 1: Create popover**
+
+```tsx
+import { useEffect, useState } from 'react';
+import { useStore } from '../state/store.js';
+
+type Props = { participantName: string; onClose: () => void };
+
+export function VolumePopover({ participantName, onClose }: Props) {
+  const { prefs, setPrefs } = useStore();
+  const [value, setValue] = useState(prefs?.participantVolumes[participantName] ?? 1);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const onCommit = async (v: number) => {
+    setValue(v);
+    if (!prefs) return;
+    const next = await window.api.setPrefs({
+      participantVolumes: { ...prefs.participantVolumes, [participantName]: v },
+    });
+    setPrefs(next);
+  };
+
+  return (
+    <div
+      className="absolute inset-0 z-10 flex items-end justify-center p-2"
+      onClick={onClose}
+    >
+      <div
+        className="flex w-full items-center gap-2 rounded bg-black/85 px-3 py-2 text-xs"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="truncate">{participantName}</span>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={value}
+          onChange={(e) => onCommit(Number(e.target.value))}
+          className="flex-1 accent-emerald-500"
+        />
+        <span className="w-8 text-right">{Math.round(value * 100)}</span>
+      </div>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 2: Add click handler in `ParticipantTile.tsx`**
+
+```tsx
+const [volOpen, setVolOpen] = useState(false);
+// on the root div: onClick={() => !p.isLocal && setVolOpen((v) => !v)}
+// inside, after audio element:
+{volOpen && !p.isLocal && (
+  <VolumePopover
+    participantName={p.name ?? p.identity}
+    onClose={() => setVolOpen(false)}
+  />
+)}
+```
+
+Apply volume in real time: in the audio-attach effect, also subscribe to `prefs.participantVolumes[name]` and set `el.volume` when it changes.
+
+```tsx
+useEffect(() => {
+  if (p.isLocal) return;
+  const el = audioRef.current;
+  if (!el) return;
+  const v = prefs?.participantVolumes[p.name ?? p.identity];
+  if (typeof v === 'number') el.volume = v;
+}, [p, prefs?.participantVolumes]);
+```
+
+- [ ] **Step 3: Manual verify**
+
+Click on remote participant tile → slider appears at bottom. Drag → audio volume changes immediately. Close, leave room, rejoin — volume restored.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add .
+git commit -m "feat(client): per-participant volume popover with persistence"
+```
+
+### Task 8.5.3: PTT activity indicator
+
+**Files:**
+- Modify: `apps/client/src/renderer/components/ControlBar.tsx`
+- Modify: `apps/client/src/renderer/views/RoomView.tsx`
+
+- [ ] **Step 1: Add PTT badge to ControlBar**
+
+```tsx
+type Props = { /* existing */; pttHeld: boolean; pttEnabled: boolean };
+// near the volume bars:
+{pttEnabled && (
+  <span
+    className={cn(
+      'ml-3 rounded px-2 py-0.5 text-[10px] uppercase tracking-wide',
+      pttHeld ? 'bg-emerald-500 text-emerald-950' : 'bg-zinc-800 text-zinc-400',
+    )}
+  >
+    PTT
+  </span>
+)}
+```
+
+- [ ] **Step 2: Track held-state in `usePushToTalk`**
+
+Replace the void return with state:
+
+```ts
+import { useEffect, useState } from 'react';
+// ... in hook:
+const [held, setHeld] = useState(false);
+// in onDown after setMicrophoneEnabled(true):
+setHeld(true);
+// in onUp before setMicrophoneEnabled(false):
+setHeld(false);
+// also reset on cleanup:
+return () => {
+  window.removeEventListener('keydown', onDown);
+  window.removeEventListener('keyup', onUp);
+  setHeld(false);
+};
+
+return held;
+```
+
+Hook signature now: `export function usePushToTalk(room: Room | null): boolean`
+
+- [ ] **Step 3: Wire in `RoomView.tsx`**
+
+```tsx
+const pttHeld = usePushToTalk(room);
+// pass to ControlBar:
+<ControlBar ... pttHeld={pttHeld} pttEnabled={!!prefs?.pushToTalk.enabled} />
+```
+
+- [ ] **Step 4: Manual verify**
+
+Enable PTT in settings. Badge "PTT" shows grey. Hold key — turns green; release — grey.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .
+git commit -m "feat(client): PTT activity indicator"
+```
+
+---
+
 ## Chunk 9: Settings & push-to-talk
 
 ### Task 9.1: Settings modal
@@ -2197,28 +2600,37 @@ export function useDeviceList(): DeviceList {
 
   useEffect(() => {
     let cancelled = false;
-    const refresh = async () => {
-      try {
-        // Permission must be granted at least once for labels to populate.
-        await navigator.mediaDevices.getUserMedia({ audio: true, video: true }).then((s) =>
-          s.getTracks().forEach((t) => t.stop()),
-        ).catch(() => undefined);
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        if (cancelled) return;
-        setList({
-          audioInputs: devices.filter((d) => d.kind === 'audioinput'),
-          audioOutputs: devices.filter((d) => d.kind === 'audiooutput'),
-          videoInputs: devices.filter((d) => d.kind === 'videoinput'),
-        });
-      } catch {
-        /* ignore */
-      }
+    let primed = false;
+
+    const enumerate = async () => {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      if (cancelled) return;
+      setList({
+        audioInputs: devices.filter((d) => d.kind === 'audioinput'),
+        audioOutputs: devices.filter((d) => d.kind === 'audiooutput'),
+        videoInputs: devices.filter((d) => d.kind === 'videoinput'),
+      });
     };
-    refresh();
-    navigator.mediaDevices.addEventListener('devicechange', refresh);
+
+    // First call: prime the permission (needed once for device labels to populate).
+    // Subsequent `devicechange` events just re-enumerate without re-prompting.
+    const init = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        stream.getTracks().forEach((t) => t.stop());
+        primed = true;
+      } catch {
+        /* permission denied — proceed with un-labeled list */
+      }
+      await enumerate();
+    };
+
+    init();
+    const onChange = () => enumerate().catch(() => undefined);
+    navigator.mediaDevices.addEventListener('devicechange', onChange);
     return () => {
       cancelled = true;
-      navigator.mediaDevices.removeEventListener('devicechange', refresh);
+      navigator.mediaDevices.removeEventListener('devicechange', onChange);
     };
   }, []);
 
@@ -2702,14 +3114,14 @@ git commit -m "feat(server): Dockerfile for production build"
 
 - [ ] **Step 1: Create `deploy/livekit.yaml`**
 
+Note: LiveKit does NOT do env-var interpolation inside YAML files. Keys are passed via the `LIVEKIT_KEYS` env variable instead (compose service below).
+
 ```yaml
 port: 7880
 rtc:
   tcp_port: 7881
   udp_port: 7882
   use_external_ip: true
-keys:
-  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
 log_level: info
 ```
 
@@ -2765,8 +3177,8 @@ services:
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
     environment:
-      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
-      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      # LiveKit reads keys from LIVEKIT_KEYS env var (format: "key: secret").
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
 
   lobby:
     build:
@@ -2913,10 +3325,13 @@ npm run package -w @voicechat/client
 
 Verify SmartScreen warning, click through, app launches, can connect to deployed server.
 
-- [ ] **Step 5: Commit version bump**
+- [ ] **Step 5: Bump version for next iteration**
+
+After verifying release works, bump `apps/client/package.json` to `0.2.0-dev` so next builds publish under a new version.
 
 ```bash
-git tag -a v0.1.0 -m "First release"
+git add apps/client/package.json
+git commit -m "chore: bump client to 0.2.0-dev"
 ```
 
 ---
