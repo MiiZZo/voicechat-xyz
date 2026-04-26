@@ -1,0 +1,7 @@
+rooms:
+  - id: general
+    name: "Общая"
+  - id: games
+    name: "Игры"
+  - id: work
+    name: "Работа"
