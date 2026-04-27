@@ -13,6 +13,17 @@ const api = {
     ipcRenderer.on(IPC.UpdateStatus, listener);
     return () => ipcRenderer.removeListener(IPC.UpdateStatus, listener);
   },
+  window: {
+    minimize: (): Promise<void> => ipcRenderer.invoke(IPC.WindowMinimize),
+    toggleMaximize: (): Promise<void> => ipcRenderer.invoke(IPC.WindowMaximizeToggle),
+    close: (): Promise<void> => ipcRenderer.invoke(IPC.WindowClose),
+    isMaximized: (): Promise<boolean> => ipcRenderer.invoke(IPC.WindowIsMaximized),
+    onMaximizedChange: (cb: (maximized: boolean) => void) => {
+      const listener = (_evt: unknown, maximized: boolean) => cb(maximized);
+      ipcRenderer.on(IPC.WindowMaximizedChanged, listener);
+      return () => ipcRenderer.removeListener(IPC.WindowMaximizedChanged, listener);
+    },
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);

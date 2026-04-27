@@ -1,7 +1,7 @@
 import { app, BrowserWindow, shell } from 'electron';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { registerIpc } from './ipc.js';
+import { registerIpc, watchWindowState } from './ipc.js';
 import { setupAutoUpdate } from './updater.js';
 import { setupTray } from './tray.js';
 import { buildAppIconImage } from './icon.js';
@@ -21,35 +21,16 @@ async function createWindow(): Promise<void> {
     backgroundColor: '#09090b',
     autoHideMenuBar: true,
     icon: buildAppIconImage(),
-    // Disable Win11 Mica/Acrylic so it doesn't lighten the caption strip
-    // — Mica blends the overlay color with desktop, which is why our
-    // titleBarOverlay color looked different from the rest of the header.
-    backgroundMaterial: 'none',
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#09090b',
-      symbolColor: '#fafafa',
-      height: 36,
-    },
+    // Fully frameless — we draw our own min/max/close in TitleBar.tsx.
+    // Trade-off: Win11 Snap layouts hover doesn't fire on custom buttons,
+    // but visual fidelity is exact.
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
     },
-  });
-
-  // Re-apply overlay after window-ready as a defensive fallback — on some
-  // Windows builds the constructor option is partially ignored until the
-  // window has been shown.
-  mainWindow.once('ready-to-show', () => {
-    if (process.platform === 'win32') {
-      mainWindow?.setTitleBarOverlay?.({
-        color: '#09090b',
-        symbolColor: '#fafafa',
-        height: 36,
-      });
-    }
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -84,8 +65,9 @@ app.on('before-quit', () => {
 });
 
 app.whenReady().then(async () => {
-  registerIpc();
+  registerIpc(() => mainWindow);
   await createWindow();
+  if (mainWindow) watchWindowState(mainWindow);
   setupTray({ getWindow: () => mainWindow, onQuit: requestQuit });
   setupAutoUpdate(() => mainWindow);
 

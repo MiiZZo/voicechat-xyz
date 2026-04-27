@@ -7,6 +7,7 @@ import { postJoin, type JoinError } from '../lib/api.js';
 import { RoomCard } from '../components/RoomCard.js';
 import { ToastTray } from '../components/Toast.js';
 import { SettingsModal } from '../components/SettingsModal.js';
+import { TitleBar } from '../components/TitleBar.js';
 import { Input } from '../components/ui/input.js';
 import { Label } from '../components/ui/label.js';
 import { Button } from '../components/ui/button.js';
@@ -51,22 +52,19 @@ export function LobbyView() {
 
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
-      <header
-        className="flex h-9 items-center justify-between border-b border-border bg-bg pl-6 pr-[150px]"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      >
+      <TitleBar>
         <span className="text-sm font-semibold tracking-tight">VoiceChat</span>
+        <span className="ml-auto" />
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setSettingsOpen(true)}
           aria-label="Настройки"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           className="h-7 w-7"
         >
           <Settings />
         </Button>
-      </header>
+      </TitleBar>
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 overflow-y-auto px-8 py-10">
         <section className="flex flex-col gap-2">

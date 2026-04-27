@@ -36,4 +36,9 @@ export const IPC = {
   CheckUpdate: 'update:check',
   InstallUpdate: 'update:install',
   UpdateStatus: 'update:status',
+  WindowMinimize: 'window:minimize',
+  WindowMaximizeToggle: 'window:maximize-toggle',
+  WindowClose: 'window:close',
+  WindowIsMaximized: 'window:is-maximized',
+  WindowMaximizedChanged: 'window:maximized-changed',
 } as const;

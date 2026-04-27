@@ -11,6 +11,7 @@ import { ChatPanel } from '../components/ChatPanel.js';
 import { ToastTray } from '../components/Toast.js';
 import { SettingsModal } from '../components/SettingsModal.js';
 import { QualityIndicator } from '../components/QualityIndicator.js';
+import { TitleBar } from '../components/TitleBar.js';
 import { ChevronLeft, Settings } from 'lucide-react';
 import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -102,27 +103,15 @@ export function RoomView() {
 
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
-      <header
-        className="flex h-9 items-center justify-between border-b border-border bg-bg pl-2 pr-[150px]"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      >
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={leaveRoom}
-          className="h-7 gap-2 px-2"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
+      <TitleBar>
+        <Button variant="ghost" size="sm" onClick={leaveRoom} className="h-7 gap-2 px-2">
           <ChevronLeft />
           <span className="text-sm font-medium">{activeRoom.roomName}</span>
           <span className="font-mono text-xs tabular-nums text-fg-subtle">
             {participants.length}/8
           </span>
         </Button>
-        <div
-          className="flex items-center gap-2"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
+        <div className="ml-auto flex items-center gap-2">
           {room && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -152,7 +141,7 @@ export function RoomView() {
             <Settings />
           </Button>
         </div>
-      </header>
+      </TitleBar>
 
       <main className="flex flex-1 overflow-hidden">
         <section className="flex-1 overflow-y-auto p-5">
