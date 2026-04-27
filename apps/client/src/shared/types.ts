@@ -11,6 +11,7 @@ export type Prefs = {
   pushToTalk: { enabled: boolean; key: string };
   participantVolumes: Record<string, number>;
   initialDeviceState: { mic: boolean; camera: boolean };
+  closeToTray: boolean;
 };
 
 export type ScreenSource = {

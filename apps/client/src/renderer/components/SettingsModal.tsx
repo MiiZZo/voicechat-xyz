@@ -101,6 +101,14 @@ export function SettingsModal({ onClose }: Props) {
           </div>
         )}
 
+        <div className="my-4 border-t border-zinc-800" />
+
+        <Toggle
+          label="Сворачивать в трей при закрытии"
+          checked={prefs.closeToTray}
+          onChange={(v) => update({ closeToTray: v })}
+        />
+
         <div className="mt-5 flex justify-end">
           <button onClick={onClose} className="rounded bg-zinc-100 px-3 py-1 text-sm text-zinc-900">
             Готово

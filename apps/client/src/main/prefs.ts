@@ -15,6 +15,7 @@ const defaults: Prefs = {
   pushToTalk: { enabled: false, key: 'AltRight' },
   participantVolumes: {},
   initialDeviceState: { mic: true, camera: false },
+  closeToTray: false,
 };
 
 export const prefsStore = new Store<Prefs>({ name: 'voicechat-prefs', defaults });

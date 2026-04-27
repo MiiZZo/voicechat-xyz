@@ -3,10 +3,13 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { registerIpc } from './ipc.js';
 import { setupAutoUpdate } from './updater.js';
+import { setupTray } from './tray.js';
+import { getPrefs } from './prefs.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow: BrowserWindow | null = null;
+let isQuitting = false;
 
 async function createWindow(): Promise<void> {
   mainWindow = new BrowserWindow({
@@ -29,6 +32,15 @@ async function createWindow(): Promise<void> {
     return { action: 'deny' };
   });
 
+  // Hide-to-tray on close, if the user opted in. The window stays alive in the
+  // background; quit happens via Tray menu, app.quit(), or app.on('before-quit').
+  mainWindow.on('close', (event) => {
+    if (isQuitting) return;
+    if (!getPrefs().closeToTray) return;
+    event.preventDefault();
+    mainWindow?.hide();
+  });
+
   if (process.env.ELECTRON_RENDERER_URL) {
     await mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
     mainWindow.webContents.openDevTools({ mode: 'detach' });
@@ -37,9 +49,19 @@ async function createWindow(): Promise<void> {
   }
 }
 
+const requestQuit = () => {
+  isQuitting = true;
+  app.quit();
+};
+
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 app.whenReady().then(async () => {
   registerIpc();
   await createWindow();
+  setupTray({ getWindow: () => mainWindow, onQuit: requestQuit });
   setupAutoUpdate(() => mainWindow);
 
   app.on('activate', () => {
@@ -48,5 +70,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  // If the user opted into hide-to-tray, the window doesn't actually close —
+  // it just hides. This handler only fires on a real close, in which case quit.
   if (process.platform !== 'darwin') app.quit();
 });
