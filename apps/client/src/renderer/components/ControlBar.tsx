@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Track, type Room } from 'livekit-client';
+import { useEffect, useState } from 'react';
+import { RoomEvent, Track, type Room } from 'livekit-client';
 import { Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 
@@ -22,19 +22,43 @@ export function ControlBar({
   pttHeld,
   pttEnabled,
 }: Props) {
-  const [micOn, setMicOn] = useState(room.localParticipant.isMicrophoneEnabled);
-  const [camOn, setCamOn] = useState(room.localParticipant.isCameraEnabled);
-  const localSharing = !!room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
+  const [, force] = useState(0);
+
+  // Subscribe to every room event that could change local mic/cam/share state.
+  // Reading via room-level events (rather than LocalParticipant.on) is the
+  // reliable path: setMicrophoneEnabled emits LocalTrackPublished on the Room,
+  // not always on LocalParticipant.
+  useEffect(() => {
+    const rerender = () => force((n) => n + 1);
+    const events = [
+      RoomEvent.LocalTrackPublished,
+      RoomEvent.LocalTrackUnpublished,
+      RoomEvent.TrackMuted,
+      RoomEvent.TrackUnmuted,
+      RoomEvent.TrackPublished,
+      RoomEvent.TrackUnpublished,
+    ] as const;
+    events.forEach((e) => room.on(e, rerender));
+    return () => {
+      events.forEach((e) => room.off(e, rerender));
+    };
+  }, [room]);
+
+  // Derive directly from LiveKit on each render — no local state to drift.
+  const lp = room.localParticipant;
+  const micPub = lp.getTrackPublication(Track.Source.Microphone);
+  const camPub = lp.getTrackPublication(Track.Source.Camera);
+  const sharePub = lp.getTrackPublication(Track.Source.ScreenShare);
+
+  const micOn = !!micPub && !micPub.isMuted;
+  const camOn = !!camPub && !camPub.isMuted;
+  const localSharing = !!sharePub;
 
   const toggleMic = async () => {
-    const next = !micOn;
-    await room.localParticipant.setMicrophoneEnabled(next);
-    setMicOn(next);
+    await lp.setMicrophoneEnabled(!micOn);
   };
   const toggleCam = async () => {
-    const next = !camOn;
-    await room.localParticipant.setCameraEnabled(next);
-    setCamOn(next);
+    await lp.setCameraEnabled(!camOn);
   };
 
   return (

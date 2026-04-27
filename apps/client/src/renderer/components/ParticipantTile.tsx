@@ -41,6 +41,11 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     };
   }, [p]);
 
+  // Track identity for stable deps — re-attach only when track or mute state actually change
+  const videoPub = p.getTrackPublication(videoSource);
+  const videoTrackSid = videoPub?.trackSid;
+  const videoMuted = videoPub?.isMuted;
+
   // Attach video track
   useEffect(() => {
     const pub: TrackPublication | undefined = p.getTrackPublication(videoSource);
@@ -51,7 +56,11 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         pub.track?.detach(el);
       };
     }
-  });
+  }, [p, videoSource, videoTrackSid, videoMuted]);
+
+  const audioPub = p.getTrackPublication(Track.Source.Microphone);
+  const audioTrackSid = audioPub?.trackSid;
+  const audioMuted = audioPub?.isMuted;
 
   // Attach remote audio (local doesn't need attach)
   useEffect(() => {
@@ -71,7 +80,7 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         pub.track?.detach(el);
       };
     }
-  });
+  }, [p, audioTrackSid, audioMuted, prefs?.audioOutputDeviceId]);
 
   // Live-update audio element volume when persisted prefs change
   useEffect(() => {
