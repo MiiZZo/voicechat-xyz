@@ -24,8 +24,16 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tileRef = useRef<HTMLDivElement | null>(null);
+  // Web Audio graph for remote audio: MediaStreamAudioSourceNode -> GainNode -> destination.
+  // We route audio through Web Audio (instead of the <audio> element's own output)
+  // so we can amplify above 100% via GainNode. The <audio> element still receives
+  // the stream (LiveKit needs an attached element to pump frames in some browsers)
+  // but is force-muted so only the WebAudio path produces sound.
   const audioCtxRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const sourceStreamIdRef = useRef<string | null>(null);
+  const [audioGraphTick, setAudioGraphTick] = useState(0);
   const { prefs } = useStore();
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
@@ -83,73 +91,164 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     }
   }, [p, videoSource, videoTrackSid, videoMuted, videoTrackReady]);
 
+  // Attach remote audio track:
+  //   1. attach() to <audio> element so LiveKit pumps the WebRTC stream;
+  //      we force-mute that element so it produces no sound itself.
+  //   2. build a Web Audio graph from the underlying MediaStreamTrack:
+  //      MediaStreamAudioSourceNode -> GainNode -> ctx.destination.
+  //      The GainNode is the single point that controls per-participant
+  //      volume (0..2) and mute (gain = 0). Using MediaStreamAudioSourceNode
+  //      (not MediaElementAudioSourceNode) avoids the one-shot-per-element
+  //      constraint, racing with LiveKit attach/detach, and lets us rebuild
+  //      the source cleanly when the track is re-subscribed.
   useEffect(() => {
     if (p.isLocal) return;
     const pub = p.getTrackPublication(Track.Source.Microphone);
+    const track = pub?.track;
     const el = audioRef.current;
-    if (pub?.track && el) {
-      pub.track.attach(el);
+    if (!track || !el) return;
 
-      // Route audio through Web Audio so we can amplify above 100%.
-      // createMediaElementSource is one-shot per element, so set up lazily and
-      // reuse the same GainNode for the lifetime of the element.
-      if (!audioCtxRef.current) {
-        try {
-          const ctx = new AudioContext();
-          const source = ctx.createMediaElementSource(el);
-          const gain = ctx.createGain();
-          source.connect(gain).connect(ctx.destination);
-          audioCtxRef.current = ctx;
-          gainNodeRef.current = gain;
-          // El's own volume is now bypassed; keep at 1 so the source signal is unattenuated.
-          el.volume = 1;
-          el.muted = false;
-        } catch {
-          // Fall back to native element control if Web Audio isn't available.
-        }
+    track.attach(el);
+    el.muted = true;
+    el.volume = 0;
+
+    let ctx = audioCtxRef.current;
+    if (!ctx) {
+      try {
+        ctx = new AudioContext();
+        audioCtxRef.current = ctx;
+      } catch {
+        // Web Audio unavailable — fall back to <audio> element.
+        el.muted = false;
+        el.volume = 1;
+        return () => {
+          track.detach(el);
+        };
       }
-
-      const ctx = audioCtxRef.current;
-      const deviceId = prefs?.audioOutputDeviceId;
-      if (deviceId) {
-        if (ctx && 'setSinkId' in ctx) {
-          (ctx as AudioContext & { setSinkId: (id: string) => Promise<void> })
-            .setSinkId(deviceId)
-            .catch(() => undefined);
-        } else if ('setSinkId' in HTMLMediaElement.prototype) {
-          (el as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> })
-            .setSinkId(deviceId)
-            .catch(() => undefined);
-        }
-      }
-
-      return () => {
-        pub.track?.detach(el);
-      };
     }
+
+    let gain = gainNodeRef.current;
+    if (!gain) {
+      gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      gainNodeRef.current = gain;
+    }
+
+    // (Re)build the MediaStreamAudioSourceNode whenever the underlying
+    // MediaStreamTrack identity changes (track unsubscribe/resubscribe,
+    // republish, etc.). MediaStreamAudioSourceNode is bound to the stream
+    // it was created from, so we can't reuse the old node across track changes.
+    const mst = track.mediaStreamTrack;
+    if (mst) {
+      const streamId = mst.id;
+      if (sourceStreamIdRef.current !== streamId) {
+        try {
+          sourceNodeRef.current?.disconnect();
+        } catch {
+          // already disconnected
+        }
+        try {
+          const stream = new MediaStream([mst]);
+          const source = ctx.createMediaStreamSource(stream);
+          source.connect(gain);
+          sourceNodeRef.current = source;
+          sourceStreamIdRef.current = streamId;
+          // Bump tick so the volume effect re-applies gain after graph rebuild.
+          setAudioGraphTick((n) => n + 1);
+        } catch {
+          // If MediaStreamAudioSourceNode construction fails, fall back to
+          // letting the <audio> element play directly so audio still works.
+          el.muted = false;
+          el.volume = 1;
+        }
+      }
+    }
+
+    ctx.resume().catch(() => undefined);
+
+    const deviceId = prefs?.audioOutputDeviceId;
+    if (deviceId) {
+      const ctxWithSink = ctx as AudioContext & {
+        setSinkId?: (id: string) => Promise<void>;
+      };
+      if (typeof ctxWithSink.setSinkId === 'function') {
+        ctxWithSink.setSinkId(deviceId).catch(() => undefined);
+      } else if ('setSinkId' in HTMLMediaElement.prototype) {
+        // setSinkId on the <audio> element won't help while the WebAudio path
+        // produces the actual sound, but set it anyway for the fallback case.
+        (el as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> })
+          .setSinkId(deviceId)
+          .catch(() => undefined);
+      }
+    }
+
+    return () => {
+      track.detach(el);
+    };
   }, [p, audioTrackSid, audioMuted, audioTrackReady, prefs?.audioOutputDeviceId]);
 
+  // Tear down Web Audio graph on unmount.
   useEffect(() => {
     return () => {
+      try {
+        sourceNodeRef.current?.disconnect();
+      } catch {
+        // ignore
+      }
+      try {
+        gainNodeRef.current?.disconnect();
+      } catch {
+        // ignore
+      }
       audioCtxRef.current?.close().catch(() => undefined);
-      audioCtxRef.current = null;
+      sourceNodeRef.current = null;
+      sourceStreamIdRef.current = null;
       gainNodeRef.current = null;
+      audioCtxRef.current = null;
     };
   }, []);
 
+  // Apply volume + mute to the GainNode. Runs on every prefs change and
+  // every time the audio graph is (re)built.
   useEffect(() => {
     if (p.isLocal) return;
-    const el = audioRef.current;
-    if (!el) return;
-    const vol = typeof persistedVolume === 'number' ? persistedVolume : 1;
     const gain = gainNodeRef.current;
-    if (gain) {
-      gain.gain.value = muted ? 0 : vol;
-    } else {
+    const ctx = audioCtxRef.current;
+    const el = audioRef.current;
+    const vol = typeof persistedVolume === 'number' ? persistedVolume : 1;
+    if (gain && ctx) {
+      // Use setTargetAtTime for a tiny ramp to avoid clicks on abrupt changes.
+      const target = muted ? 0 : vol;
+      try {
+        gain.gain.setTargetAtTime(target, ctx.currentTime, 0.01);
+      } catch {
+        gain.gain.value = target;
+      }
+      if (el) {
+        el.muted = true;
+        el.volume = 0;
+      }
+      if (ctx.state === 'suspended') ctx.resume().catch(() => undefined);
+    } else if (el) {
+      // WebAudio not available — fall back to native element controls.
       el.muted = muted;
       el.volume = Math.min(1, vol);
     }
-  }, [p, muted, persistedVolume]);
+  }, [p, muted, persistedVolume, audioGraphTick]);
+
+  // AudioContext may start suspended in Electron until first user gesture.
+  // Resume on the next pointer/key event.
+  useEffect(() => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || ctx.state !== 'suspended') return;
+    const resume = () => ctx.resume().catch(() => undefined);
+    window.addEventListener('pointerdown', resume, { once: true });
+    window.addEventListener('keydown', resume, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', resume);
+      window.removeEventListener('keydown', resume);
+    };
+  }, [audioGraphTick]);
 
   const micPub = p.getTrackPublication(Track.Source.Microphone);
   const camPub = p.getTrackPublication(videoSource);
