@@ -11,6 +11,10 @@ type Props = {
 const dragStyle = { WebkitAppRegion: 'drag' } as React.CSSProperties;
 const noDragStyle = { WebkitAppRegion: 'no-drag' } as React.CSSProperties;
 
+/** Apply to any interactive element placed inside <TitleBar>'s children
+ *  so it remains clickable instead of inheriting the drag region. */
+export const titleBarNoDrag = noDragStyle;
+
 export function TitleBar({ children, className }: Props) {
   const [maximized, setMaximized] = useState(false);
 
@@ -34,11 +38,7 @@ export function TitleBar({ children, className }: Props) {
       )}
       style={dragStyle}
     >
-      <div className="flex min-w-0 flex-1 items-center px-3" style={dragStyle}>
-        <div className="flex min-w-0 flex-1 items-center gap-3" style={noDragStyle}>
-          {children}
-        </div>
-      </div>
+      <div className="flex min-w-0 flex-1 items-center gap-3 px-3">{children}</div>
 
       <div className="flex items-stretch" style={noDragStyle}>
         <CtrlButton

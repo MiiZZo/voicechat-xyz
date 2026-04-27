@@ -7,7 +7,7 @@ import { postJoin, type JoinError } from '../lib/api.js';
 import { RoomCard } from '../components/RoomCard.js';
 import { ToastTray } from '../components/Toast.js';
 import { SettingsModal } from '../components/SettingsModal.js';
-import { TitleBar } from '../components/TitleBar.js';
+import { TitleBar, titleBarNoDrag } from '../components/TitleBar.js';
 import { Input } from '../components/ui/input.js';
 import { Label } from '../components/ui/label.js';
 import { Button } from '../components/ui/button.js';
@@ -61,6 +61,7 @@ export function LobbyView() {
           onClick={() => setSettingsOpen(true)}
           aria-label="Настройки"
           className="h-7 w-7"
+          style={titleBarNoDrag}
         >
           <Settings />
         </Button>

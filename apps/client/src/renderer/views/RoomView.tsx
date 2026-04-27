@@ -11,7 +11,7 @@ import { ChatPanel } from '../components/ChatPanel.js';
 import { ToastTray } from '../components/Toast.js';
 import { SettingsModal } from '../components/SettingsModal.js';
 import { QualityIndicator } from '../components/QualityIndicator.js';
-import { TitleBar } from '../components/TitleBar.js';
+import { TitleBar, titleBarNoDrag } from '../components/TitleBar.js';
 import { ChevronLeft, Settings } from 'lucide-react';
 import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -104,7 +104,13 @@ export function RoomView() {
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
       <TitleBar>
-        <Button variant="ghost" size="sm" onClick={leaveRoom} className="h-7 gap-2 px-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={leaveRoom}
+          className="h-7 gap-2 px-2"
+          style={titleBarNoDrag}
+        >
           <ChevronLeft />
           <span className="text-sm font-medium">{activeRoom.roomName}</span>
           <span className="font-mono text-xs tabular-nums text-fg-subtle">
@@ -115,7 +121,10 @@ export function RoomView() {
           {room && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="flex cursor-default items-center gap-1.5 rounded-md px-2 py-1 text-fg-muted hover:bg-bg-muted/40">
+                <span
+                  className="flex cursor-default items-center gap-1.5 rounded-md px-2 py-1 text-fg-muted hover:bg-bg-muted/40"
+                  style={titleBarNoDrag}
+                >
                   <QualityIndicator quality={qualities.get(room.localParticipant.identity)} />
                   <span className="font-mono text-[10px] tabular-nums">
                     {rttMs !== null ? `${Math.round(rttMs)} ms` : '— ms'}
@@ -137,6 +146,7 @@ export function RoomView() {
             onClick={() => setSettingsOpen(true)}
             aria-label="Настройки"
             className="h-7 w-7"
+            style={titleBarNoDrag}
           >
             <Settings />
           </Button>
