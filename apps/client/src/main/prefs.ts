@@ -10,7 +10,7 @@ const defaults: Prefs = {
   audioConstraints: {
     echoCancellation: true,
     noiseSuppression: true,
-    autoGainControl: true,
+    autoGainControl: false,
   },
   pushToTalk: { enabled: false, key: 'AltRight' },
   participantVolumes: {},
