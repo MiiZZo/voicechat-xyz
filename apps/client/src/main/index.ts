@@ -4,6 +4,7 @@ import path from 'node:path';
 import { registerIpc } from './ipc.js';
 import { setupAutoUpdate } from './updater.js';
 import { setupTray } from './tray.js';
+import { buildAppIconImage } from './icon.js';
 import { getPrefs } from './prefs.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,6 +20,7 @@ async function createWindow(): Promise<void> {
     minHeight: 560,
     backgroundColor: '#09090b',
     autoHideMenuBar: true,
+    icon: buildAppIconImage(),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,

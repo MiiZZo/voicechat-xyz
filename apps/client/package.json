@@ -6,9 +6,10 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "icons": "node scripts/generate-icons.mjs",
+    "build": "npm run icons && electron-vite build",
     "preview": "electron-vite preview",
-    "package": "electron-vite build && electron-builder",
+    "package": "npm run icons && electron-vite build && electron-builder",
     "lint": "eslint src"
   },
   "dependencies": {
