@@ -1,7 +1,17 @@
+{
+    email admin@example.com
+}
+
 {$LOBBY_DOMAIN} {
+    tls {
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+    }
     reverse_proxy lobby:3000
 }
 
 {$LIVEKIT_DOMAIN} {
+    tls {
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+    }
     reverse_proxy livekit:7880
 }

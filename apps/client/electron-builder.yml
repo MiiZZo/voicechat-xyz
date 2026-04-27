@@ -15,5 +15,5 @@ nsis:
   perMachine: false
 publish:
   provider: github
-  owner: REPLACE_ME
-  repo: voicechat
+  owner: MiiZZo
+  repo: voicechat-xyz

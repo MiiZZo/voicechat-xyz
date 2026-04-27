@@ -1,8 +1,15 @@
 import electronUpdater from 'electron-updater';
+import log from 'electron-log/main.js';
 import type { BrowserWindow } from 'electron';
 import { IPC, type UpdateStatus } from '../shared/types.js';
 
 const { autoUpdater } = electronUpdater;
+
+// electron-updater is silent without a logger — wire up electron-log so we can
+// see ACME-like detail in %APPDATA%/VoiceChat/logs/main.log on user machines.
+log.transports.file.level = 'info';
+log.transports.console.level = 'debug';
+autoUpdater.logger = log;
 
 let getWindow: () => BrowserWindow | null = () => null;
 let lastStatus: UpdateStatus = { kind: 'idle' };

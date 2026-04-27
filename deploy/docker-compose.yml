@@ -1,6 +1,8 @@
 services:
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: .
+      dockerfile: Caddy.Dockerfile
     restart: unless-stopped
     ports:
       - "80:80"
@@ -12,6 +14,7 @@ services:
     environment:
       LOBBY_DOMAIN: ${LOBBY_DOMAIN}
       LIVEKIT_DOMAIN: ${LIVEKIT_DOMAIN}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
     depends_on:
       - lobby
       - livekit
