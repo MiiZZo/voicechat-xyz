@@ -5,6 +5,7 @@ import { usePollRooms } from '../hooks/usePollRooms.js';
 import { postJoin, type JoinError } from '../lib/api.js';
 import { RoomCard } from '../components/RoomCard.js';
 import { ToastTray } from '../components/Toast.js';
+import { SettingsModal } from '../components/SettingsModal.js';
 import { Settings } from 'lucide-react';
 
 const ERROR_MAP: Record<JoinError['kind'], string> = {
@@ -20,6 +21,7 @@ export function LobbyView() {
   const { rooms, roomsLoading, roomsError, prefs, setPrefs, enterRoom } = useStore();
   const { push } = useToasts();
   const [joining, setJoining] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   usePollRooms(true);
 
   if (!prefs) return null;
@@ -48,7 +50,7 @@ export function LobbyView() {
     <div className="flex h-screen flex-col bg-zinc-950 text-zinc-100">
       <header className="flex items-center justify-between border-b border-zinc-800 px-6 py-3">
         <div className="text-lg font-semibold">VoiceChat</div>
-        <button className="rounded p-2 hover:bg-zinc-800" aria-label="Settings">
+        <button onClick={() => setSettingsOpen(true)} className="rounded p-2 hover:bg-zinc-800" aria-label="Settings">
           <Settings size={18} />
         </button>
       </header>
@@ -86,6 +88,8 @@ export function LobbyView() {
       </main>
 
       <ToastTray />
+
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

@@ -9,7 +9,8 @@ import { ControlBar } from '../components/ControlBar.js';
 import { ScreenSourcePicker } from '../components/ScreenSourcePicker.js';
 import { ChatPanel } from '../components/ChatPanel.js';
 import { ToastTray } from '../components/Toast.js';
-import { ChevronLeft } from 'lucide-react';
+import { SettingsModal } from '../components/SettingsModal.js';
+import { ChevronLeft, Settings } from 'lucide-react';
 import type { ScreenSource } from '../../shared/types.js';
 
 export function RoomView() {
@@ -20,6 +21,7 @@ export function RoomView() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [screenShareParticipant, setScreenShareParticipant] = useState<Participant | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (!room) return;
@@ -101,7 +103,12 @@ export function RoomView() {
         <button onClick={leaveRoom} className="flex items-center gap-1 rounded p-2 text-sm hover:bg-zinc-800">
           <ChevronLeft size={16} /> {activeRoom.roomName} ({participants.length}/8)
         </button>
-        <span className="text-xs text-zinc-500">{state}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-500">{state}</span>
+          <button onClick={() => setSettingsOpen(true)} className="rounded p-2 hover:bg-zinc-800" aria-label="Settings">
+            <Settings size={18} />
+          </button>
+        </div>
       </header>
 
       <main className="flex flex-1 overflow-hidden">
@@ -137,6 +144,8 @@ export function RoomView() {
       )}
 
       <ToastTray />
+
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
