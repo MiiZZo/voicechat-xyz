@@ -1,0 +1,7 @@
+{$LOBBY_DOMAIN} {
+    reverse_proxy lobby:3000
+}
+
+{$LIVEKIT_DOMAIN} {
+    reverse_proxy livekit:7880
+}
