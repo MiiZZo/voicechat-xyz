@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { RoomEvent, Track, type Participant } from 'livekit-client';
 import { useStore } from '../state/store.js';
 import { useLiveKitRoom } from '../hooks/useLiveKitRoom.js';
-import { useMicLevel } from '../hooks/useMicLevel.js';
 import { usePushToTalk } from '../hooks/usePushToTalk.js';
 import { useConnectionQuality, qualityLabel } from '../hooks/useConnectionQuality.js';
 import { ParticipantTile } from '../components/ParticipantTile.js';
@@ -20,7 +19,6 @@ import type { ScreenSource } from '../../shared/types.js';
 export function RoomView() {
   const { activeRoom, leaveRoom, prefs } = useStore();
   const { room, state } = useLiveKitRoom();
-  const level = useMicLevel(room);
   const pttHeld = usePushToTalk(room);
   const { qualities, rttMs } = useConnectionQuality(room);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -166,7 +164,6 @@ export function RoomView() {
           onLeave={leaveRoom}
           remoteSharing={remoteSharing}
           onToggleScreenShare={onToggleScreenShare}
-          level={level}
           pttHeld={pttHeld}
           pttEnabled={!!prefs?.pushToTalk.enabled}
         />

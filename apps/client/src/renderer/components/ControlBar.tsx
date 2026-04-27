@@ -11,7 +11,6 @@ type Props = {
   onLeave: () => void;
   onToggleScreenShare: () => void;
   remoteSharing: boolean;
-  level: number;
   pttHeld: boolean;
   pttEnabled: boolean;
 };
@@ -21,7 +20,6 @@ export function ControlBar({
   onLeave,
   onToggleScreenShare,
   remoteSharing,
-  level,
   pttHeld,
   pttEnabled,
 }: Props) {
@@ -80,20 +78,7 @@ export function ControlBar({
           onClick={onToggleScreenShare}
         />
 
-        <Separator orientation="vertical" className="mx-2 h-6" />
-
-        <div className="flex items-end gap-0.5" aria-label="Уровень микрофона">
-          {[0.08, 0.2, 0.36, 0.56, 0.78].map((thr, i) => (
-            <span
-              key={i}
-              style={{ height: `${4 + i * 3}px` }}
-              className={cn(
-                'w-[3px] rounded-sm transition',
-                level > thr ? 'bg-accent' : 'bg-bg-muted',
-              )}
-            />
-          ))}
-        </div>
+        {pttEnabled && <Separator orientation="vertical" className="mx-2 h-6" />}
 
         {pttEnabled && (
           <span
