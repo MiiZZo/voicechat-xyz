@@ -52,12 +52,7 @@ export function LobbyView() {
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
       <header className="flex items-center justify-between border-b border-border px-8 py-5">
-        <div className="flex items-baseline gap-3">
-          <span className="font-display text-3xl italic tracking-tight">VoiceChat</span>
-          <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-fg-subtle sm:inline">
-            late · night · studio
-          </span>
-        </div>
+        <span className="text-xl font-semibold tracking-tight">VoiceChat</span>
         <Button
           variant="ghost"
           size="icon"

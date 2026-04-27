@@ -103,7 +103,7 @@ export function RoomView() {
       <header className="flex items-center justify-between border-b border-border bg-bg-elevated/40 px-5 py-3 backdrop-blur">
         <Button variant="ghost" size="sm" onClick={leaveRoom} className="-ml-2 gap-2">
           <ChevronLeft />
-          <span className="font-display text-xl italic">{activeRoom.roomName}</span>
+          <span className="text-base font-medium">{activeRoom.roomName}</span>
           <span className="font-mono text-xs tabular-nums text-fg-subtle">
             {participants.length}/8
           </span>

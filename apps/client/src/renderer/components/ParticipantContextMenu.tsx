@@ -41,7 +41,7 @@ export function ParticipantContextMenu({ participantName, children }: Props) {
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="w-64">
-        <ContextMenuLabel className="font-display text-sm italic normal-case tracking-normal text-fg">
+        <ContextMenuLabel className="text-xs font-semibold normal-case tracking-normal text-fg">
           {participantName}
         </ContextMenuLabel>
         <ContextMenuSeparator />
@@ -56,12 +56,10 @@ export function ParticipantContextMenu({ participantName, children }: Props) {
           <span>{muted ? 'Включить звук' : 'Замьютить'}</span>
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <div className="px-2 py-2">
-          <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-wider text-fg-muted">
-            <span>Громкость</span>
-            <span className="font-mono tabular-nums text-fg">{Math.round(volume * 100)}%</span>
-          </div>
+        <div className="flex items-center gap-3 px-2 py-2">
+          <span className="text-xs text-fg-muted">Громкость</span>
           <Slider
+            className="flex-1"
             value={[volume]}
             min={0}
             max={1}
@@ -69,6 +67,9 @@ export function ParticipantContextMenu({ participantName, children }: Props) {
             disabled={muted}
             onValueChange={(v) => setVolume(v[0] ?? 1)}
           />
+          <span className="w-9 text-right font-mono text-[11px] tabular-nums text-fg">
+            {Math.round(volume * 100)}
+          </span>
         </div>
       </ContextMenuContent>
     </ContextMenu>

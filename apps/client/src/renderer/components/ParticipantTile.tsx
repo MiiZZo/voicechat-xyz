@@ -5,7 +5,7 @@ import {
   type Participant,
   type TrackPublication,
 } from 'livekit-client';
-import { Mic, MicOff, VideoOff, VolumeX } from 'lucide-react';
+import { Mic, MicOff, VideoOff, VolumeX, Maximize2 } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { useStore } from '../state/store.js';
 import { Avatar, AvatarFallback, avatarColor } from './ui/avatar.js';
@@ -20,9 +20,22 @@ type Props = {
 export function ParticipantTile({ p, big = false, videoSource = Track.Source.Camera }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const tileRef = useRef<HTMLDivElement | null>(null);
   const { prefs } = useStore();
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
+
+  const requestFullscreen = (e?: React.MouseEvent | React.SyntheticEvent) => {
+    e?.stopPropagation();
+    e?.preventDefault();
+    const target = videoRef.current ?? tileRef.current;
+    if (!target) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => undefined);
+    } else {
+      target.requestFullscreen?.().catch(() => undefined);
+    }
+  };
 
   const participantKey = p.name ?? p.identity;
   const muted = !p.isLocal && !!prefs?.participantMuted[participantKey];
@@ -95,6 +108,8 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
 
   const tile = (
     <div
+      ref={tileRef}
+      onDoubleClick={(e) => showVideo && requestFullscreen(e)}
       className={cn(
         'group relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border bg-bg-elevated transition-shadow',
         speaking ? 'border-accent/80 shadow-[0_0_0_1px_hsl(0_0%_100%/0.3)]' : 'border-border',
@@ -113,7 +128,7 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       ) : (
         <div className="flex flex-col items-center gap-3">
           <Avatar className={cn('h-16 w-16 shadow-lg', big && 'h-24 w-24')}>
-            <AvatarFallback className={cn('text-2xl font-display italic', avatarColor(participantKey), big && 'text-4xl')}>
+            <AvatarFallback className={cn('text-2xl font-semibold', avatarColor(participantKey), big && 'text-4xl')}>
               {initial}
             </AvatarFallback>
           </Avatar>
@@ -121,6 +136,18 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       )}
 
       {!p.isLocal && <audio ref={audioRef} autoPlay />}
+
+      {showVideo && (
+        <button
+          type="button"
+          onClick={requestFullscreen}
+          className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-fg opacity-0 backdrop-blur transition-opacity hover:bg-black/80 group-hover:opacity-100 focus-visible:opacity-100"
+          aria-label="Открыть на весь экран"
+          title="Открыть на весь экран (двойной клик)"
+        >
+          <Maximize2 className="h-3.5 w-3.5" />
+        </button>
+      )}
 
       {/* Status chips — top right */}
       <div className="absolute right-2 top-2 flex items-center gap-1">

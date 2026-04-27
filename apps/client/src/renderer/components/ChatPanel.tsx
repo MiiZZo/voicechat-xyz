@@ -96,7 +96,7 @@ export function ChatPanel({ room }: { room: Room }) {
   return (
     <aside className="flex w-80 flex-col border-l border-border bg-bg-elevated/30">
       <div className="flex items-baseline gap-2 border-b border-border px-4 py-3">
-        <span className="font-display text-lg italic text-fg">Чат</span>
+        <span className="text-sm font-semibold tracking-tight text-fg">Чат</span>
         <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-subtle">
           live
         </span>
