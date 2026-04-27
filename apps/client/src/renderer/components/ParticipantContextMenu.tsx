@@ -53,7 +53,7 @@ export function ParticipantContextMenu({ participantName, children }: Props) {
           className="[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0"
         >
           {muted ? <Volume2 /> : <VolumeX />}
-          <span>{muted ? 'Включить звук' : 'Замьютить'}</span>
+          <span>{muted ? 'Включить звук' : 'Отключить звук'}</span>
         </ContextMenuItem>
         <ContextMenuSeparator />
         <div className="flex items-center gap-3 px-2 py-2">

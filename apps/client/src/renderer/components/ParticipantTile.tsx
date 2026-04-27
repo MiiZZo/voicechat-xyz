@@ -58,9 +58,14 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const videoPub = p.getTrackPublication(videoSource);
   const videoTrackSid = videoPub?.trackSid;
   const videoMuted = videoPub?.isMuted;
+  // Track-presence is tracked separately because a publication may exist
+  // (TrackPublished fired) before the track is actually subscribed
+  // (TrackSubscribed fires later). Without this in deps we'd skip attach.
+  const videoTrackReady = !!videoPub?.track;
   const audioPub = p.getTrackPublication(Track.Source.Microphone);
   const audioTrackSid = audioPub?.trackSid;
   const audioMuted = audioPub?.isMuted;
+  const audioTrackReady = !!audioPub?.track;
 
   useEffect(() => {
     const pub: TrackPublication | undefined = p.getTrackPublication(videoSource);
@@ -71,7 +76,7 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         pub.track?.detach(el);
       };
     }
-  }, [p, videoSource, videoTrackSid, videoMuted]);
+  }, [p, videoSource, videoTrackSid, videoMuted, videoTrackReady]);
 
   useEffect(() => {
     if (p.isLocal) return;
@@ -88,7 +93,7 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         pub.track?.detach(el);
       };
     }
-  }, [p, audioTrackSid, audioMuted, prefs?.audioOutputDeviceId]);
+  }, [p, audioTrackSid, audioMuted, audioTrackReady, prefs?.audioOutputDeviceId]);
 
   useEffect(() => {
     if (p.isLocal) return;
