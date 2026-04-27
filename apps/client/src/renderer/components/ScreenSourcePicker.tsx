@@ -14,7 +14,7 @@ export function ScreenSourcePicker({ onPick, onCancel }: Props) {
   return (
     <Dialog open onOpenChange={(o) => !o && onCancel()}>
       <DialogContent className="max-w-3xl">
-        <DialogHeader>
+        <DialogHeader className="pr-8">
           <DialogTitle>Демонстрация экрана</DialogTitle>
           <DialogDescription>Выберите окно или экран для трансляции</DialogDescription>
         </DialogHeader>
@@ -26,14 +26,19 @@ export function ScreenSourcePicker({ onPick, onCancel }: Props) {
               <button
                 key={s.id}
                 onClick={() => onPick(s)}
-                className="group flex flex-col gap-2 rounded-lg border border-border bg-bg-muted/30 p-2 text-left transition-all hover:border-accent hover:bg-bg-muted"
+                className="group flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-bg-muted/30 p-2 text-left transition-all hover:border-fg-subtle hover:bg-bg-muted"
               >
                 <img
                   src={s.thumbnailDataUrl}
                   alt={s.name}
-                  className="aspect-video w-full rounded-md object-cover ring-1 ring-border transition group-hover:ring-accent/50"
+                  className="aspect-video w-full rounded-md object-cover ring-1 ring-border transition group-hover:ring-fg-subtle/60"
                 />
-                <div className="truncate text-xs text-fg-muted group-hover:text-fg">{s.name}</div>
+                <div
+                  className="line-clamp-2 min-w-0 break-all text-xs leading-snug text-fg-muted group-hover:text-fg"
+                  title={s.name}
+                >
+                  {s.name}
+                </div>
               </button>
             ))}
           </div>

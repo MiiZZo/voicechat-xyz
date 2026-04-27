@@ -33,7 +33,7 @@ function linkify(text: string): ReactNode[] {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="underline decoration-fg-subtle decoration-1 underline-offset-2 transition hover:text-fg hover:decoration-fg"
+        className="break-all underline decoration-fg-subtle decoration-1 underline-offset-2 transition hover:text-fg hover:decoration-fg"
       >
         {url}
       </a>,
@@ -158,7 +158,7 @@ function MessageRow({ message, isLocal }: { message: ChatMessage; isLocal: boole
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className={cn('flex gap-2.5', isLocal && 'flex-row-reverse')}>
+        <div className={cn('flex w-full min-w-0 gap-2.5', isLocal && 'flex-row-reverse')}>
           <Avatar className="h-7 w-7 shrink-0">
             <AvatarFallback
               className={cn('text-[10px] font-medium', avatarColor(message.fromName))}
@@ -166,17 +166,17 @@ function MessageRow({ message, isLocal }: { message: ChatMessage; isLocal: boole
               {message.fromName.slice(0, 1).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <div className={cn('flex max-w-[80%] flex-col gap-0.5', isLocal && 'items-end')}>
+          <div className={cn('flex min-w-0 max-w-[calc(100%-2.5rem)] flex-col gap-0.5', isLocal && 'items-end')}>
             <span className="text-[10px] uppercase tracking-wider text-fg-subtle">
               {isLocal ? 'ты' : message.fromName}
             </span>
             <div
               className={cn(
-                'rounded-2xl border border-border bg-bg-muted/60 px-3 py-2 text-sm text-fg',
+                'max-w-full rounded-2xl border border-border bg-bg-muted/60 px-3 py-2 text-sm text-fg [overflow-wrap:anywhere]',
                 isLocal ? 'rounded-tr-sm' : 'rounded-tl-sm',
               )}
             >
-              <span className="whitespace-pre-wrap break-words">{linkify(message.text)}</span>
+              <span className="whitespace-pre-wrap">{linkify(message.text)}</span>
             </div>
           </div>
         </div>
