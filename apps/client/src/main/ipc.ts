@@ -19,4 +19,13 @@ export function registerIpc(): void {
       thumbnailDataUrl: s.thumbnail.toDataURL(),
     }));
   });
+
+  ipcMain.handle(IPC.CheckUpdate, async () => {
+    const { manualCheck } = await import('./updater.js');
+    await manualCheck();
+  });
+  ipcMain.handle(IPC.InstallUpdate, async () => {
+    const { quitAndInstall } = await import('./updater.js');
+    quitAndInstall();
+  });
 }
