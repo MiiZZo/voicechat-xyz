@@ -8,6 +8,7 @@ import {
 import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { useStore } from '../state/store.js';
+import { VolumePopover } from './VolumePopover.js';
 
 type Props = {
   p: Participant;
@@ -20,6 +21,7 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { prefs } = useStore();
   const [, force] = useState(0);
+  const [volOpen, setVolOpen] = useState(false);
   const rerender = () => force((n) => n + 1);
 
   // Subscribe to participant track events
@@ -71,6 +73,15 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     }
   });
 
+  // Live-update audio element volume when persisted prefs change
+  useEffect(() => {
+    if (p.isLocal) return;
+    const el = audioRef.current;
+    if (!el) return;
+    const v = prefs?.participantVolumes[p.name ?? p.identity];
+    if (typeof v === 'number') el.volume = v;
+  }, [p, prefs?.participantVolumes]);
+
   const micPub = p.getTrackPublication(Track.Source.Microphone);
   const camPub = p.getTrackPublication(videoSource);
   const speaking = p.isSpeaking;
@@ -78,10 +89,12 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
 
   return (
     <div
+      onClick={() => !p.isLocal && setVolOpen((v) => !v)}
       className={cn(
         'relative flex aspect-video items-center justify-center rounded-lg border bg-zinc-900',
         speaking ? 'border-emerald-500' : 'border-zinc-800',
         big && 'col-span-2 row-span-2',
+        !p.isLocal && 'cursor-pointer',
       )}
     >
       {showVideo ? (
@@ -101,6 +114,12 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         {!camPub || camPub.isMuted ? <VideoOff size={12} /> : <Video size={12} />}
         <span>{p.name}</span>
       </div>
+      {volOpen && !p.isLocal && (
+        <VolumePopover
+          participantName={p.name ?? p.identity}
+          onClose={() => setVolOpen(false)}
+        />
+      )}
     </div>
   );
 }
