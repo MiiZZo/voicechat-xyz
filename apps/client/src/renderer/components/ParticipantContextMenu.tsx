@@ -62,13 +62,13 @@ export function ParticipantContextMenu({ participantName, children }: Props) {
             className="flex-1"
             value={[volume]}
             min={0}
-            max={1}
+            max={2}
             step={0.05}
             disabled={muted}
             onValueChange={(v) => setVolume(v[0] ?? 1)}
           />
-          <span className="w-9 text-right font-mono text-[11px] tabular-nums text-fg">
-            {Math.round(volume * 100)}
+          <span className="w-12 text-right font-mono text-[11px] tabular-nums text-fg">
+            {Math.round(volume * 100)}%
           </span>
         </div>
       </ContextMenuContent>

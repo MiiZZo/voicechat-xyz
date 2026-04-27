@@ -24,6 +24,8 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tileRef = useRef<HTMLDivElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
   const { prefs } = useStore();
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
@@ -87,11 +89,40 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     const el = audioRef.current;
     if (pub?.track && el) {
       pub.track.attach(el);
-      if (prefs?.audioOutputDeviceId && 'setSinkId' in HTMLMediaElement.prototype) {
-        (el as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> })
-          .setSinkId(prefs.audioOutputDeviceId)
-          .catch(() => undefined);
+
+      // Route audio through Web Audio so we can amplify above 100%.
+      // createMediaElementSource is one-shot per element, so set up lazily and
+      // reuse the same GainNode for the lifetime of the element.
+      if (!audioCtxRef.current) {
+        try {
+          const ctx = new AudioContext();
+          const source = ctx.createMediaElementSource(el);
+          const gain = ctx.createGain();
+          source.connect(gain).connect(ctx.destination);
+          audioCtxRef.current = ctx;
+          gainNodeRef.current = gain;
+          // El's own volume is now bypassed; keep at 1 so the source signal is unattenuated.
+          el.volume = 1;
+          el.muted = false;
+        } catch {
+          // Fall back to native element control if Web Audio isn't available.
+        }
       }
+
+      const ctx = audioCtxRef.current;
+      const deviceId = prefs?.audioOutputDeviceId;
+      if (deviceId) {
+        if (ctx && 'setSinkId' in ctx) {
+          (ctx as AudioContext & { setSinkId: (id: string) => Promise<void> })
+            .setSinkId(deviceId)
+            .catch(() => undefined);
+        } else if ('setSinkId' in HTMLMediaElement.prototype) {
+          (el as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> })
+            .setSinkId(deviceId)
+            .catch(() => undefined);
+        }
+      }
+
       return () => {
         pub.track?.detach(el);
       };
@@ -99,11 +130,25 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   }, [p, audioTrackSid, audioMuted, audioTrackReady, prefs?.audioOutputDeviceId]);
 
   useEffect(() => {
+    return () => {
+      audioCtxRef.current?.close().catch(() => undefined);
+      audioCtxRef.current = null;
+      gainNodeRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
     if (p.isLocal) return;
     const el = audioRef.current;
     if (!el) return;
-    el.muted = muted;
-    el.volume = typeof persistedVolume === 'number' ? persistedVolume : 1;
+    const vol = typeof persistedVolume === 'number' ? persistedVolume : 1;
+    const gain = gainNodeRef.current;
+    if (gain) {
+      gain.gain.value = muted ? 0 : vol;
+    } else {
+      el.muted = muted;
+      el.volume = Math.min(1, vol);
+    }
   }, [p, muted, persistedVolume]);
 
   const micPub = p.getTrackPublication(Track.Source.Microphone);
