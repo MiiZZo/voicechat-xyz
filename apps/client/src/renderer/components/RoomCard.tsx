@@ -17,12 +17,17 @@ export function RoomCard({ room, disabled, onJoin }: Props) {
         'disabled:cursor-not-allowed disabled:opacity-50',
       )}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={cn('h-2.5 w-2.5 rounded-full', active ? 'bg-emerald-500' : 'bg-zinc-600')} />
-          <span className="font-medium">{room.displayName}</span>
+      <div className="flex w-full items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className={cn(
+              'h-2.5 w-2.5 shrink-0 rounded-full',
+              active ? 'bg-emerald-500' : 'bg-zinc-600',
+            )}
+          />
+          <span className="truncate font-medium">{room.displayName}</span>
         </div>
-        <span className="text-sm text-zinc-400">
+        <span className="shrink-0 text-sm text-zinc-400">
           {room.participants.length}/{room.maxParticipants}
         </span>
       </div>
