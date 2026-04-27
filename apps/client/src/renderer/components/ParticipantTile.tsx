@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  ConnectionQuality,
   ParticipantEvent,
   Track,
   type Participant,
@@ -10,14 +11,16 @@ import { cn } from '../lib/cn.js';
 import { useStore } from '../state/store.js';
 import { Avatar, AvatarFallback, avatarColor } from './ui/avatar.js';
 import { ParticipantContextMenu } from './ParticipantContextMenu.js';
+import { QualityIndicator } from './QualityIndicator.js';
 
 type Props = {
   p: Participant;
   big?: boolean;
   videoSource?: Track.Source;
+  quality?: ConnectionQuality;
 };
 
-export function ParticipantTile({ p, big = false, videoSource = Track.Source.Camera }: Props) {
+export function ParticipantTile({ p, big = false, videoSource = Track.Source.Camera, quality }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tileRef = useRef<HTMLDivElement | null>(null);
@@ -156,6 +159,11 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
 
       {/* Status chips — top right */}
       <div className="absolute right-2 top-2 flex items-center gap-1">
+        {quality !== undefined && quality !== ConnectionQuality.Excellent && (
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 backdrop-blur" title="Качество соединения">
+            <QualityIndicator quality={quality} />
+          </span>
+        )}
         {micOff && (
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-rose-300 backdrop-blur">
             <MicOff size={12} />

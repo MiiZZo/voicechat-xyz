@@ -4,14 +4,17 @@ import { useStore } from '../state/store.js';
 import { useLiveKitRoom } from '../hooks/useLiveKitRoom.js';
 import { useMicLevel } from '../hooks/useMicLevel.js';
 import { usePushToTalk } from '../hooks/usePushToTalk.js';
+import { useConnectionQuality, qualityLabel } from '../hooks/useConnectionQuality.js';
 import { ParticipantTile } from '../components/ParticipantTile.js';
 import { ControlBar } from '../components/ControlBar.js';
 import { ScreenSourcePicker } from '../components/ScreenSourcePicker.js';
 import { ChatPanel } from '../components/ChatPanel.js';
 import { ToastTray } from '../components/Toast.js';
 import { SettingsModal } from '../components/SettingsModal.js';
+import { QualityIndicator } from '../components/QualityIndicator.js';
 import { ChevronLeft, Settings } from 'lucide-react';
 import { Button } from '../components/ui/button.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ScreenSource } from '../../shared/types.js';
 
 export function RoomView() {
@@ -19,6 +22,7 @@ export function RoomView() {
   const { room, state } = useLiveKitRoom();
   const level = useMicLevel(room);
   const pttHeld = usePushToTalk(room);
+  const { qualities, rttMs } = useConnectionQuality(room);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [screenShareParticipant, setScreenShareParticipant] = useState<Participant | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -109,6 +113,22 @@ export function RoomView() {
           </span>
         </Button>
         <div className="flex items-center gap-3">
+          {room && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex cursor-default items-center gap-1.5 rounded-md px-2 py-1 text-fg-muted hover:bg-bg-muted/40">
+                  <QualityIndicator quality={qualities.get(room.localParticipant.identity)} />
+                  <span className="font-mono text-[10px] tabular-nums">
+                    {rttMs !== null ? `${Math.round(rttMs)} ms` : '— ms'}
+                  </span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                Соединение: {qualityLabel(qualities.get(room.localParticipant.identity))}
+                {rttMs !== null && ` · ${Math.round(rttMs)} мс до сервера`}
+              </TooltipContent>
+            </Tooltip>
+          )}
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-subtle">
             {state}
           </span>
@@ -132,6 +152,7 @@ export function RoomView() {
                 p={p}
                 big={p === screenShareParticipant}
                 videoSource={p === screenShareParticipant ? Track.Source.ScreenShare : Track.Source.Camera}
+                quality={qualities.get(p.identity)}
               />
             ))}
           </div>
