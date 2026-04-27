@@ -8,7 +8,7 @@
 
 import zlib from 'node:zlib';
 
-const BG = { r: 16, g: 185, b: 129 }; // emerald-500
+const BG = { r: 9, g: 9, b: 11 }; // emerald-500
 const FG = { r: 255, g: 255, b: 255 };
 
 /** Draw the app icon at the given square size. Returns RGBA buffer. */

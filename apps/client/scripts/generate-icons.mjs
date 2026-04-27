@@ -15,7 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const outDir = resolve(__dirname, '..', 'build');
 mkdirSync(outDir, { recursive: true });
 
-const BG = { r: 16, g: 185, b: 129 };
+const BG = { r: 9, g: 9, b: 11 };
 const FG = { r: 255, g: 255, b: 255 };
 
 function drawAppIconRgba(size) {
