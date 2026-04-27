@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { RoomEvent, Track, type Participant } from 'livekit-client';
 import { useStore } from '../state/store.js';
 import { useLiveKitRoom } from '../hooks/useLiveKitRoom.js';
+import { useMicLevel } from '../hooks/useMicLevel.js';
 import { ParticipantTile } from '../components/ParticipantTile.js';
 import { ControlBar } from '../components/ControlBar.js';
 import { ScreenSourcePicker } from '../components/ScreenSourcePicker.js';
@@ -13,6 +14,7 @@ import type { ScreenSource } from '../../shared/types.js';
 export function RoomView() {
   const { activeRoom, leaveRoom } = useStore();
   const { room, state } = useLiveKitRoom();
+  const level = useMicLevel(room);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [screenShareParticipant, setScreenShareParticipant] = useState<Participant | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -122,6 +124,7 @@ export function RoomView() {
           onLeave={leaveRoom}
           remoteSharing={remoteSharing}
           onToggleScreenShare={onToggleScreenShare}
+          level={level}
         />
       )}
 

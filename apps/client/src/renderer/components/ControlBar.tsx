@@ -8,9 +8,16 @@ type Props = {
   onLeave: () => void;
   onToggleScreenShare: () => void;
   remoteSharing: boolean;
+  level: number;
 };
 
-export function ControlBar({ room, onLeave, onToggleScreenShare, remoteSharing }: Props) {
+export function ControlBar({
+  room,
+  onLeave,
+  onToggleScreenShare,
+  remoteSharing,
+  level,
+}: Props) {
   const [micOn, setMicOn] = useState(room.localParticipant.isMicrophoneEnabled);
   const [camOn, setCamOn] = useState(room.localParticipant.isCameraEnabled);
   const localSharing = !!room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
@@ -38,6 +45,17 @@ export function ControlBar({ room, onLeave, onToggleScreenShare, remoteSharing }
         iconOn={<MonitorUp size={18} />}
         iconOff={<MonitorUp size={18} />}
       />
+      <div className="ml-3 flex items-center gap-0.5">
+        {[0.1, 0.25, 0.45, 0.65, 0.85].map((thr, i) => (
+          <span
+            key={i}
+            className={cn(
+              'h-3 w-1 rounded-sm transition',
+              level > thr ? 'bg-emerald-500' : 'bg-zinc-800',
+            )}
+          />
+        ))}
+      </div>
       <button
         onClick={onLeave}
         className="ml-4 flex items-center gap-2 rounded-md bg-red-900/80 px-4 py-2 text-sm hover:bg-red-900"
