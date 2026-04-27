@@ -21,6 +21,16 @@ async function createWindow(): Promise<void> {
     backgroundColor: '#09090b',
     autoHideMenuBar: true,
     icon: buildAppIconImage(),
+    // Hide the native Windows title bar; keep the system min/max/close
+    // controls rendered by the OS (so Snap layouts hover etc. still work),
+    // tinted to match our dark theme. Everything to the left of those
+    // controls is our app — draggable via -webkit-app-region: drag in CSS.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#09090b',
+      symbolColor: '#fafafa',
+      height: 40,
+    },
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,

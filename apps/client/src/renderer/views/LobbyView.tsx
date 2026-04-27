@@ -51,13 +51,18 @@ export function LobbyView() {
 
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
-      <header className="flex items-center justify-between border-b border-border px-8 py-5">
-        <span className="text-xl font-semibold tracking-tight">VoiceChat</span>
+      <header
+        className="flex h-10 items-center justify-between border-b border-border pl-6 pr-[150px]"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <span className="text-sm font-semibold tracking-tight">VoiceChat</span>
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setSettingsOpen(true)}
           aria-label="Настройки"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          className="h-7 w-7"
         >
           <Settings />
         </Button>

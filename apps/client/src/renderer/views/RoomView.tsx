@@ -102,15 +102,27 @@ export function RoomView() {
 
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
-      <header className="flex items-center justify-between border-b border-border bg-bg-elevated/40 px-5 py-3 backdrop-blur">
-        <Button variant="ghost" size="sm" onClick={leaveRoom} className="-ml-2 gap-2">
+      <header
+        className="flex h-10 items-center justify-between border-b border-border bg-bg-elevated/40 pl-2 pr-[150px] backdrop-blur"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={leaveRoom}
+          className="h-7 gap-2 px-2"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
           <ChevronLeft />
-          <span className="text-base font-medium">{activeRoom.roomName}</span>
+          <span className="text-sm font-medium">{activeRoom.roomName}</span>
           <span className="font-mono text-xs tabular-nums text-fg-subtle">
             {participants.length}/8
           </span>
         </Button>
-        <div className="flex items-center gap-3">
+        <div
+          className="flex items-center gap-2"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
           {room && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -135,6 +147,7 @@ export function RoomView() {
             size="icon"
             onClick={() => setSettingsOpen(true)}
             aria-label="Настройки"
+            className="h-7 w-7"
           >
             <Settings />
           </Button>
