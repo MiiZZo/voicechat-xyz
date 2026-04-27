@@ -9,6 +9,8 @@ type Props = {
   onToggleScreenShare: () => void;
   remoteSharing: boolean;
   level: number;
+  pttHeld: boolean;
+  pttEnabled: boolean;
 };
 
 export function ControlBar({
@@ -17,6 +19,8 @@ export function ControlBar({
   onToggleScreenShare,
   remoteSharing,
   level,
+  pttHeld,
+  pttEnabled,
 }: Props) {
   const [micOn, setMicOn] = useState(room.localParticipant.isMicrophoneEnabled);
   const [camOn, setCamOn] = useState(room.localParticipant.isCameraEnabled);
@@ -45,6 +49,16 @@ export function ControlBar({
         iconOn={<MonitorUp size={18} />}
         iconOff={<MonitorUp size={18} />}
       />
+      {pttEnabled && (
+        <span
+          className={cn(
+            'ml-3 rounded px-2 py-0.5 text-[10px] uppercase tracking-wide',
+            pttHeld ? 'bg-emerald-500 text-emerald-950' : 'bg-zinc-800 text-zinc-400',
+          )}
+        >
+          PTT
+        </span>
+      )}
       <div className="ml-3 flex items-center gap-0.5">
         {[0.1, 0.25, 0.45, 0.65, 0.85].map((thr, i) => (
           <span

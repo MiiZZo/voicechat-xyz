@@ -3,6 +3,7 @@ import { RoomEvent, Track, type Participant } from 'livekit-client';
 import { useStore } from '../state/store.js';
 import { useLiveKitRoom } from '../hooks/useLiveKitRoom.js';
 import { useMicLevel } from '../hooks/useMicLevel.js';
+import { usePushToTalk } from '../hooks/usePushToTalk.js';
 import { ParticipantTile } from '../components/ParticipantTile.js';
 import { ControlBar } from '../components/ControlBar.js';
 import { ScreenSourcePicker } from '../components/ScreenSourcePicker.js';
@@ -12,9 +13,10 @@ import { ChevronLeft } from 'lucide-react';
 import type { ScreenSource } from '../../shared/types.js';
 
 export function RoomView() {
-  const { activeRoom, leaveRoom } = useStore();
+  const { activeRoom, leaveRoom, prefs } = useStore();
   const { room, state } = useLiveKitRoom();
   const level = useMicLevel(room);
+  const pttHeld = usePushToTalk(room);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [screenShareParticipant, setScreenShareParticipant] = useState<Participant | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -125,6 +127,8 @@ export function RoomView() {
           remoteSharing={remoteSharing}
           onToggleScreenShare={onToggleScreenShare}
           level={level}
+          pttHeld={pttHeld}
+          pttEnabled={!!prefs?.pushToTalk.enabled}
         />
       )}
 
