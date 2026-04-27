@@ -3,6 +3,8 @@ import { RoomEvent, Track, type Participant } from 'livekit-client';
 import { useStore } from '../state/store.js';
 import { useLiveKitRoom } from '../hooks/useLiveKitRoom.js';
 import { usePushToTalk } from '../hooks/usePushToTalk.js';
+import { useVoiceActivation } from '../hooks/useVoiceActivation.js';
+import { useMicActivationModeSync } from '../hooks/useMicActivationModeSync.js';
 import { useConnectionQuality, qualityLabel } from '../hooks/useConnectionQuality.js';
 import { ParticipantTile } from '../components/ParticipantTile.js';
 import { ControlBar } from '../components/ControlBar.js';
@@ -21,6 +23,8 @@ export function RoomView() {
   const { activeRoom, leaveRoom, prefs } = useStore();
   const { room, state } = useLiveKitRoom();
   const pttHeld = usePushToTalk(room);
+  const vadOpen = useVoiceActivation(room);
+  useMicActivationModeSync(room);
   const { qualities, rttMs } = useConnectionQuality(room);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [screenShareParticipant, setScreenShareParticipant] = useState<Participant | null>(null);
@@ -176,8 +180,9 @@ export function RoomView() {
           onLeave={leaveRoom}
           remoteSharing={remoteSharing}
           onToggleScreenShare={onToggleScreenShare}
+          micActivationMode={prefs?.micActivationMode ?? 'always'}
           pttHeld={pttHeld}
-          pttEnabled={!!prefs?.pushToTalk.enabled}
+          vadOpen={vadOpen}
         />
       )}
 

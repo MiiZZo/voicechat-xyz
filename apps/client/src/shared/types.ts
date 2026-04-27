@@ -1,3 +1,13 @@
+/**
+ * How the local microphone gate is driven.
+ *  - 'always' — mic is open whenever the user enables it from the ControlBar (default).
+ *  - 'ptt'    — push-to-talk: mic stays muted, key hold opens it.
+ *  - 'vad'    — voice activation: an analyser opens the gate when input level
+ *               crosses {@link Prefs.voiceActivation.thresholdDb}.
+ * The three modes are mutually exclusive.
+ */
+export type MicActivationMode = 'always' | 'ptt' | 'vad';
+
 export type Prefs = {
   displayName: string;
   audioInputDeviceId: string | null;
@@ -8,7 +18,16 @@ export type Prefs = {
     noiseSuppression: boolean;
     autoGainControl: boolean;
   };
+  micActivationMode: MicActivationMode;
   pushToTalk: { enabled: boolean; key: string };
+  voiceActivation: {
+    /** Open-gate threshold in dBFS, typically -60..0. Higher = less sensitive. */
+    thresholdDb: number;
+    /** How long the gate stays open after level drops below threshold (ms). */
+    releaseMs: number;
+    /** Hysteresis: once open, gate uses (threshold - hysteresisDb) to prevent flapping. */
+    hysteresisDb: number;
+  };
   participantVolumes: Record<string, number>;
   participantMuted: Record<string, boolean>;
   initialDeviceState: { mic: boolean; camera: boolean };

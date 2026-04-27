@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { RoomEvent, Track, type Room } from 'livekit-client';
 import { Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff } from 'lucide-react';
 import { cn } from '../lib/cn.js';
+import type { MicActivationMode } from '../../shared/types.js';
 import { Button } from './ui/button.js';
 import { Separator } from './ui/separator.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.js';
@@ -11,8 +12,9 @@ type Props = {
   onLeave: () => void;
   onToggleScreenShare: () => void;
   remoteSharing: boolean;
+  micActivationMode: MicActivationMode;
   pttHeld: boolean;
-  pttEnabled: boolean;
+  vadOpen: boolean;
 };
 
 export function ControlBar({
@@ -20,8 +22,9 @@ export function ControlBar({
   onLeave,
   onToggleScreenShare,
   remoteSharing,
+  micActivationMode,
   pttHeld,
-  pttEnabled,
+  vadOpen,
 }: Props) {
   const [, force] = useState(0);
 
@@ -78,9 +81,11 @@ export function ControlBar({
           onClick={onToggleScreenShare}
         />
 
-        {pttEnabled && <Separator orientation="vertical" className="mx-2 h-6" />}
+        {micActivationMode !== 'always' && (
+          <Separator orientation="vertical" className="mx-2 h-6" />
+        )}
 
-        {pttEnabled && (
+        {micActivationMode === 'ptt' && (
           <span
             className={cn(
               'rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors',
@@ -88,6 +93,17 @@ export function ControlBar({
             )}
           >
             PTT
+          </span>
+        )}
+        {micActivationMode === 'vad' && (
+          <span
+            className={cn(
+              'rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors',
+              vadOpen ? 'bg-accent text-accent-fg' : 'bg-bg-muted text-fg-subtle',
+            )}
+            title="Голосовая активация"
+          >
+            VAD
           </span>
         )}
 

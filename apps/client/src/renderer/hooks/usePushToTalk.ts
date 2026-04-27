@@ -14,12 +14,19 @@ export function usePushToTalk(room: Room | null): boolean {
   const { prefs } = useStore();
   const [held, setHeld] = useState(false);
 
+  // Activated only when PTT is the chosen mic activation mode. Falls back to
+  // the legacy `pushToTalk.enabled` flag for backwards compatibility, in case
+  // a prefs migration somehow misses setting `micActivationMode`.
+  const active =
+    prefs?.micActivationMode === 'ptt' ||
+    (prefs?.micActivationMode === undefined && prefs?.pushToTalk.enabled === true);
+
   useEffect(() => {
-    if (!room || !prefs?.pushToTalk.enabled) {
+    if (!room || !active) {
       setHeld(false);
       return;
     }
-    const key = prefs.pushToTalk.key;
+    const key = prefs?.pushToTalk.key ?? 'AltRight';
 
     // Initial mute
     room.localParticipant.setMicrophoneEnabled(false).catch(() => undefined);
@@ -48,7 +55,7 @@ export function usePushToTalk(room: Room | null): boolean {
       window.removeEventListener('keyup', onUp);
       setHeld(false);
     };
-  }, [room, prefs?.pushToTalk.enabled, prefs?.pushToTalk.key]);
+  }, [room, active, prefs?.pushToTalk.key]);
 
   return held;
 }
