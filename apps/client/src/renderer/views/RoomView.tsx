@@ -103,7 +103,7 @@ export function RoomView() {
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
       <header
-        className="flex h-10 items-center justify-between border-b border-border bg-bg-elevated/40 pl-2 pr-[150px] backdrop-blur"
+        className="flex h-9 items-center justify-between border-b border-border bg-bg pl-2 pr-[150px]"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         <Button

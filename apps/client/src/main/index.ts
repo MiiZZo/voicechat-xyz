@@ -29,7 +29,7 @@ async function createWindow(): Promise<void> {
     titleBarOverlay: {
       color: '#09090b',
       symbolColor: '#fafafa',
-      height: 40,
+      height: 36,
     },
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.mjs'),

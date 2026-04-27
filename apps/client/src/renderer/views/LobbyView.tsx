@@ -52,7 +52,7 @@ export function LobbyView() {
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
       <header
-        className="flex h-10 items-center justify-between border-b border-border pl-6 pr-[150px]"
+        className="flex h-9 items-center justify-between border-b border-border bg-bg pl-6 pr-[150px]"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         <span className="text-sm font-semibold tracking-tight">VoiceChat</span>
