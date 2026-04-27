@@ -16,21 +16,21 @@ export function RoomCard({ room, disabled, onJoin }: Props) {
       disabled={disabled || full}
       onClick={onJoin}
       className={cn(
-        'group relative flex w-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-bg-elevated/40 p-5 text-left transition-all',
+        'group relative flex w-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-bg-elevated/40 px-5 py-4 text-left transition-all',
         'hover:border-fg-subtle/40 hover:bg-bg-elevated hover:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.6)]',
         'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-bg-elevated/40',
         active && 'border-accent/30',
       )}
     >
-      <div className="flex w-full items-baseline justify-between gap-3">
-        <div className="flex min-w-0 items-baseline gap-3">
+      <div className="flex w-full items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <span
             className={cn(
-              'h-1.5 w-1.5 shrink-0 translate-y-[-2px] rounded-full transition-colors',
+              'h-2 w-2 shrink-0 rounded-full transition-colors',
               active ? 'bg-accent shadow-[0_0_8px_hsl(43_96%_56%/0.6)]' : 'bg-fg-subtle/40',
             )}
           />
-          <span className="truncate font-display text-2xl italic leading-none text-fg">
+          <span className="truncate text-base font-medium tracking-tight text-fg">
             {room.displayName}
           </span>
         </div>
@@ -40,8 +40,8 @@ export function RoomCard({ room, disabled, onJoin }: Props) {
         </span>
       </div>
 
-      {room.participants.length > 0 ? (
-        <div className="flex items-center gap-2">
+      {room.participants.length > 0 && (
+        <div className="flex items-center gap-2 pl-5">
           <div className="flex -space-x-2">
             {visible.map((p) => (
               <Avatar
@@ -63,8 +63,6 @@ export function RoomCard({ room, disabled, onJoin }: Props) {
             {room.participants.map((p) => p.name).join(', ')}
           </span>
         </div>
-      ) : (
-        <div className="text-xs text-fg-subtle">Пусто — будь первым</div>
       )}
     </button>
   );
