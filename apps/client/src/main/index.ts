@@ -21,10 +21,10 @@ async function createWindow(): Promise<void> {
     backgroundColor: '#09090b',
     autoHideMenuBar: true,
     icon: buildAppIconImage(),
-    // Hide the native Windows title bar; keep the system min/max/close
-    // controls rendered by the OS (so Snap layouts hover etc. still work),
-    // tinted to match our dark theme. Everything to the left of those
-    // controls is our app — draggable via -webkit-app-region: drag in CSS.
+    // Disable Win11 Mica/Acrylic so it doesn't lighten the caption strip
+    // — Mica blends the overlay color with desktop, which is why our
+    // titleBarOverlay color looked different from the rest of the header.
+    backgroundMaterial: 'none',
     titleBarStyle: 'hidden',
     titleBarOverlay: {
       color: '#09090b',
@@ -37,6 +37,19 @@ async function createWindow(): Promise<void> {
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  // Re-apply overlay after window-ready as a defensive fallback — on some
+  // Windows builds the constructor option is partially ignored until the
+  // window has been shown.
+  mainWindow.once('ready-to-show', () => {
+    if (process.platform === 'win32') {
+      mainWindow?.setTitleBarOverlay?.({
+        color: '#09090b',
+        symbolColor: '#fafafa',
+        height: 36,
+      });
+    }
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
