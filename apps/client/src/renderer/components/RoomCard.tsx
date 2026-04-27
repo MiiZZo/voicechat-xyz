@@ -27,7 +27,7 @@ export function RoomCard({ room, disabled, onJoin }: Props) {
           <span
             className={cn(
               'h-2 w-2 shrink-0 rounded-full transition-colors',
-              active ? 'bg-accent shadow-[0_0_8px_hsl(43_96%_56%/0.6)]' : 'bg-fg-subtle/40',
+              active ? 'bg-accent shadow-[0_0_8px_hsl(0_0%_100%/0.4)]' : 'bg-fg-subtle/40',
             )}
           />
           <span className="truncate text-base font-medium tracking-tight text-fg">

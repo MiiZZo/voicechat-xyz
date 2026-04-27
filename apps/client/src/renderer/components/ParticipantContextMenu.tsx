@@ -45,18 +45,15 @@ export function ParticipantContextMenu({ participantName, children }: Props) {
           {participantName}
         </ContextMenuLabel>
         <ContextMenuSeparator />
-        <ContextMenuItem onSelect={(e) => { e.preventDefault(); toggleMute(); }}>
-          {muted ? (
-            <>
-              <Volume2 size={14} />
-              <span>Включить звук</span>
-            </>
-          ) : (
-            <>
-              <VolumeX size={14} />
-              <span>Замьютить</span>
-            </>
-          )}
+        <ContextMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            toggleMute();
+          }}
+          className="[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0"
+        >
+          {muted ? <Volume2 /> : <VolumeX />}
+          <span>{muted ? 'Включить звук' : 'Замьютить'}</span>
         </ContextMenuItem>
         <ContextMenuSeparator />
         <div className="px-2 py-2">

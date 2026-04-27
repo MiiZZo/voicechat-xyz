@@ -15,15 +15,15 @@ export default {
         // Surfaces (zinc base, slightly warm)
         bg: { DEFAULT: 'hsl(240 10% 4%)', elevated: 'hsl(240 6% 10%)', muted: 'hsl(240 4% 14%)' },
         fg: { DEFAULT: 'hsl(0 0% 98%)', muted: 'hsl(240 5% 65%)', subtle: 'hsl(240 4% 46%)' },
-        // Warm single accent — amber, like a desk lamp
+        // Neutral near-white accent — quiet, premium, doesn't compete
         accent: {
-          DEFAULT: 'hsl(43 96% 56%)',
-          soft: 'hsl(43 96% 56% / 0.15)',
-          fg: 'hsl(20 14% 4%)',
+          DEFAULT: 'hsl(0 0% 98%)',
+          soft: 'hsl(0 0% 100% / 0.1)',
+          fg: 'hsl(240 10% 4%)',
         },
         border: 'hsl(240 4% 16%)',
         input: 'hsl(240 4% 16%)',
-        ring: 'hsl(43 96% 56%)',
+        ring: 'hsl(0 0% 98%)',
         background: 'hsl(240 10% 4%)',
         foreground: 'hsl(0 0% 98%)',
         primary: { DEFAULT: 'hsl(0 0% 98%)', foreground: 'hsl(240 10% 4%)' },
@@ -44,8 +44,8 @@ export default {
           to: { height: '0' },
         },
         'speaking-pulse': {
-          '0%, 100%': { boxShadow: '0 0 0 0 hsl(43 96% 56% / 0.55)' },
-          '50%': { boxShadow: '0 0 0 6px hsl(43 96% 56% / 0)' },
+          '0%, 100%': { boxShadow: '0 0 0 0 hsl(0 0% 98% / 0.4)' },
+          '50%': { boxShadow: '0 0 0 5px hsl(0 0% 98% / 0)' },
         },
       },
       animation: {

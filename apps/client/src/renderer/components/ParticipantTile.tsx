@@ -97,7 +97,7 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     <div
       className={cn(
         'group relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border bg-bg-elevated transition-shadow',
-        speaking ? 'border-accent shadow-[0_0_0_1px_hsl(43_96%_56%/0.4)]' : 'border-border',
+        speaking ? 'border-accent/80 shadow-[0_0_0_1px_hsl(0_0%_100%/0.3)]' : 'border-border',
         speaking && 'animate-speaking-pulse',
         big && 'col-span-2 row-span-2',
       )}
@@ -144,7 +144,7 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       {/* Name pill — bottom left */}
       <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs backdrop-blur">
         {!micOff && (
-          <Mic size={11} className={cn(speaking ? 'text-accent' : 'text-fg-subtle')} />
+          <Mic size={11} className={cn(speaking ? 'text-fg' : 'text-fg-subtle')} />
         )}
         <span className="font-medium text-fg">{p.name}</span>
         {p.isLocal && <span className="text-fg-subtle">·  ты</span>}

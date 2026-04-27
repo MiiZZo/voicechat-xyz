@@ -1,13 +1,48 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { RoomEvent, type Room, type RemoteParticipant } from 'livekit-client';
-import { Send } from 'lucide-react';
-import { useStore } from '../state/store.js';
+import { Send, Copy, ClipboardCopy } from 'lucide-react';
+import { useStore, type ChatMessage } from '../state/store.js';
 import { Avatar, AvatarFallback, avatarColor } from './ui/avatar.js';
 import { Input } from './ui/input.js';
 import { Button } from './ui/button.js';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from './ui/context-menu.js';
+import { useToasts } from '../state/toast-store.js';
 import { cn } from '../lib/cn.js';
 
 type WirePayload = { type: 'chat'; text: string; timestamp: number };
+
+const URL_RE = /(https?:\/\/[^\s]+)/g;
+
+/** Split text into a sequence of strings and clickable <a> nodes for any URLs. */
+function linkify(text: string): ReactNode[] {
+  const parts: ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  URL_RE.lastIndex = 0;
+  while ((m = URL_RE.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    const url = m[0];
+    parts.push(
+      <a
+        key={`${m.index}-${url}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline decoration-fg-subtle decoration-1 underline-offset-2 transition hover:text-fg hover:decoration-fg"
+      >
+        {url}
+      </a>,
+    );
+    last = m.index + url.length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
 
 export function ChatPanel({ room }: { room: Room }) {
   const { chat, pushChat } = useStore();
@@ -70,38 +105,13 @@ export function ChatPanel({ room }: { room: Room }) {
       <div ref={listRef} className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
         {chat.length === 0 && (
           <div className="my-auto text-center text-xs text-fg-subtle">
-            Сообщений пока нет.
-            <br />
-            Напишите первым.
+            Сообщений пока нет
           </div>
         )}
         {chat.map((m) => {
           const isLocal = m.fromIdentity === room.localParticipant.identity;
           return (
-            <div key={m.id} className={cn('flex gap-2.5', isLocal && 'flex-row-reverse')}>
-              <Avatar className="h-7 w-7 shrink-0">
-                <AvatarFallback
-                  className={cn('text-[10px] font-medium', avatarColor(m.fromName))}
-                >
-                  {m.fromName.slice(0, 1).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className={cn('flex max-w-[80%] flex-col gap-0.5', isLocal && 'items-end')}>
-                <span className="text-[10px] uppercase tracking-wider text-fg-subtle">
-                  {isLocal ? 'ты' : m.fromName}
-                </span>
-                <div
-                  className={cn(
-                    'rounded-2xl px-3 py-2 text-sm',
-                    isLocal
-                      ? 'rounded-tr-md bg-accent text-accent-fg'
-                      : 'rounded-tl-md bg-bg-muted text-fg',
-                  )}
-                >
-                  <span className="whitespace-pre-wrap break-words">{m.text}</span>
-                </div>
-              </div>
-            </div>
+            <MessageRow key={m.id} message={m} isLocal={isLocal} />
           );
         })}
       </div>
@@ -114,16 +124,85 @@ export function ChatPanel({ room }: { room: Room }) {
           placeholder="Сообщение…"
           className="h-9"
         />
-        <Button
-          type="submit"
-          variant="accent"
-          size="icon"
-          aria-label="Отправить"
-          disabled={!text.trim()}
-        >
+        <Button type="submit" size="icon" aria-label="Отправить" disabled={!text.trim()}>
           <Send />
         </Button>
       </form>
     </aside>
+  );
+}
+
+function MessageRow({ message, isLocal }: { message: ChatMessage; isLocal: boolean }) {
+  const { push } = useToasts();
+
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(message.text);
+      push('info', 'Сообщение скопировано');
+    } catch {
+      push('error', 'Не удалось скопировать');
+    }
+  };
+
+  const copySelection = async () => {
+    const sel = window.getSelection()?.toString().trim();
+    if (!sel) return;
+    try {
+      await navigator.clipboard.writeText(sel);
+      push('info', 'Скопировано');
+    } catch {
+      push('error', 'Не удалось скопировать');
+    }
+  };
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className={cn('flex gap-2.5', isLocal && 'flex-row-reverse')}>
+          <Avatar className="h-7 w-7 shrink-0">
+            <AvatarFallback
+              className={cn('text-[10px] font-medium', avatarColor(message.fromName))}
+            >
+              {message.fromName.slice(0, 1).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className={cn('flex max-w-[80%] flex-col gap-0.5', isLocal && 'items-end')}>
+            <span className="text-[10px] uppercase tracking-wider text-fg-subtle">
+              {isLocal ? 'ты' : message.fromName}
+            </span>
+            <div
+              className={cn(
+                'rounded-2xl border border-border bg-bg-muted/60 px-3 py-2 text-sm text-fg',
+                isLocal ? 'rounded-tr-sm' : 'rounded-tl-sm',
+              )}
+            >
+              <span className="whitespace-pre-wrap break-words">{linkify(message.text)}</span>
+            </div>
+          </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        <ContextMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            void copyMessage();
+          }}
+          className="[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0"
+        >
+          <Copy />
+          <span>Копировать сообщение</span>
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            void copySelection();
+          }}
+          className="[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0"
+        >
+          <ClipboardCopy />
+          <span>Копировать выделенное</span>
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
