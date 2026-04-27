@@ -10,6 +10,7 @@ export type Prefs = {
   };
   pushToTalk: { enabled: boolean; key: string };
   participantVolumes: Record<string, number>;
+  participantMuted: Record<string, boolean>;
   initialDeviceState: { mic: boolean; camera: boolean };
   closeToTray: boolean;
 };

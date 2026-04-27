@@ -5,15 +5,15 @@ import {
   type Participant,
   type TrackPublication,
 } from 'livekit-client';
-import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, VolumeX } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { useStore } from '../state/store.js';
-import { VolumePopover } from './VolumePopover.js';
+import { ParticipantContextMenu } from './ParticipantContextMenu.js';
 
 type Props = {
   p: Participant;
   big?: boolean;
-  videoSource?: Track.Source; // default: Camera
+  videoSource?: Track.Source;
 };
 
 export function ParticipantTile({ p, big = false, videoSource = Track.Source.Camera }: Props) {
@@ -21,8 +21,11 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { prefs } = useStore();
   const [, force] = useState(0);
-  const [volOpen, setVolOpen] = useState(false);
   const rerender = () => force((n) => n + 1);
+
+  const participantKey = p.name ?? p.identity;
+  const muted = !p.isLocal && !!prefs?.participantMuted[participantKey];
+  const persistedVolume = prefs?.participantVolumes[participantKey];
 
   // Subscribe to participant track events
   useEffect(() => {
@@ -41,10 +44,13 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     };
   }, [p]);
 
-  // Track identity for stable deps — re-attach only when track or mute state actually change
+  // Stable deps for attach effects
   const videoPub = p.getTrackPublication(videoSource);
   const videoTrackSid = videoPub?.trackSid;
   const videoMuted = videoPub?.isMuted;
+  const audioPub = p.getTrackPublication(Track.Source.Microphone);
+  const audioTrackSid = audioPub?.trackSid;
+  const audioMuted = audioPub?.isMuted;
 
   // Attach video track
   useEffect(() => {
@@ -58,19 +64,13 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     }
   }, [p, videoSource, videoTrackSid, videoMuted]);
 
-  const audioPub = p.getTrackPublication(Track.Source.Microphone);
-  const audioTrackSid = audioPub?.trackSid;
-  const audioMuted = audioPub?.isMuted;
-
-  // Attach remote audio (local doesn't need attach)
+  // Attach remote audio
   useEffect(() => {
     if (p.isLocal) return;
     const pub = p.getTrackPublication(Track.Source.Microphone);
     const el = audioRef.current;
     if (pub?.track && el) {
       pub.track.attach(el);
-      const persistedVol = prefs?.participantVolumes[p.name ?? p.identity];
-      if (typeof persistedVol === 'number') el.volume = persistedVol;
       if (prefs?.audioOutputDeviceId && 'setSinkId' in HTMLMediaElement.prototype) {
         (el as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> })
           .setSinkId(prefs.audioOutputDeviceId)
@@ -82,28 +82,26 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     }
   }, [p, audioTrackSid, audioMuted, prefs?.audioOutputDeviceId]);
 
-  // Live-update audio element volume when persisted prefs change
+  // Live volume + mute sync
   useEffect(() => {
     if (p.isLocal) return;
     const el = audioRef.current;
     if (!el) return;
-    const v = prefs?.participantVolumes[p.name ?? p.identity];
-    if (typeof v === 'number') el.volume = v;
-  }, [p, prefs?.participantVolumes]);
+    el.muted = muted;
+    el.volume = typeof persistedVolume === 'number' ? persistedVolume : 1;
+  }, [p, muted, persistedVolume]);
 
   const micPub = p.getTrackPublication(Track.Source.Microphone);
   const camPub = p.getTrackPublication(videoSource);
   const speaking = p.isSpeaking;
   const showVideo = camPub && !camPub.isMuted;
 
-  return (
+  const tile = (
     <div
-      onClick={() => !p.isLocal && setVolOpen((v) => !v)}
       className={cn(
         'relative flex aspect-video items-center justify-center rounded-lg border bg-zinc-900',
         speaking ? 'border-emerald-500' : 'border-zinc-800',
         big && 'col-span-2 row-span-2',
-        !p.isLocal && 'cursor-pointer',
       )}
     >
       {showVideo ? (
@@ -122,13 +120,12 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         {!micPub || micPub.isMuted ? <MicOff size={12} /> : <Mic size={12} />}
         {!camPub || camPub.isMuted ? <VideoOff size={12} /> : <Video size={12} />}
         <span>{p.name}</span>
+        {muted && <VolumeX size={12} className="ml-1 text-red-400" />}
       </div>
-      {volOpen && !p.isLocal && (
-        <VolumePopover
-          participantName={p.name ?? p.identity}
-          onClose={() => setVolOpen(false)}
-        />
-      )}
     </div>
   );
+
+  if (p.isLocal) return tile;
+
+  return <ParticipantContextMenu participantName={participantKey}>{tile}</ParticipantContextMenu>;
 }

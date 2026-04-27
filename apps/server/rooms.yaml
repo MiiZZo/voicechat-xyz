@@ -1,7 +1,5 @@
 rooms:
   - id: general
-    name: "Общая"
+    name: "Dota"
   - id: games
-    name: "Игры"
-  - id: work
-    name: "Работа"
+    name: "Nowain"

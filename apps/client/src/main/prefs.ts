@@ -14,6 +14,7 @@ const defaults: Prefs = {
   },
   pushToTalk: { enabled: false, key: 'AltRight' },
   participantVolumes: {},
+  participantMuted: {},
   initialDeviceState: { mic: true, camera: false },
   closeToTray: true,
 };
