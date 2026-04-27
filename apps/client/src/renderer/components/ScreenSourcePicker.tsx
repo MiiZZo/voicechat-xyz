@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog.js';
 import type { ScreenSource } from '../../shared/types.js';
 
 type Props = { onPick: (source: ScreenSource) => void; onCancel: () => void };
@@ -11,31 +12,33 @@ export function ScreenSourcePicker({ onPick, onCancel }: Props) {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-6">
-      <div className="max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Выберите экран или окно</h2>
-          <button onClick={onCancel} className="rounded px-3 py-1 text-sm hover:bg-zinc-800">
-            Отмена
-          </button>
-        </div>
+    <Dialog open onOpenChange={(o) => !o && onCancel()}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Демонстрация экрана</DialogTitle>
+          <DialogDescription>Выберите окно или экран для трансляции</DialogDescription>
+        </DialogHeader>
         {!sources ? (
-          <div className="text-zinc-500">Загрузка…</div>
+          <div className="py-12 text-center text-sm text-fg-subtle">Загрузка источников…</div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div className="grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto pr-1 md:grid-cols-3">
             {sources.map((s) => (
               <button
                 key={s.id}
                 onClick={() => onPick(s)}
-                className="flex flex-col gap-2 rounded border border-zinc-800 p-2 hover:border-zinc-600"
+                className="group flex flex-col gap-2 rounded-lg border border-border bg-bg-muted/30 p-2 text-left transition-all hover:border-accent hover:bg-bg-muted"
               >
-                <img src={s.thumbnailDataUrl} alt={s.name} className="aspect-video w-full rounded object-cover" />
-                <div className="truncate text-xs">{s.name}</div>
+                <img
+                  src={s.thumbnailDataUrl}
+                  alt={s.name}
+                  className="aspect-video w-full rounded-md object-cover ring-1 ring-border transition group-hover:ring-accent/50"
+                />
+                <div className="truncate text-xs text-fg-muted group-hover:text-fg">{s.name}</div>
               </button>
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

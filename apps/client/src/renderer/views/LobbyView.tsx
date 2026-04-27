@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Settings } from 'lucide-react';
 import { useStore } from '../state/store.js';
 import { useToasts } from '../state/toast-store.js';
 import { usePollRooms } from '../hooks/usePollRooms.js';
@@ -6,7 +7,9 @@ import { postJoin, type JoinError } from '../lib/api.js';
 import { RoomCard } from '../components/RoomCard.js';
 import { ToastTray } from '../components/Toast.js';
 import { SettingsModal } from '../components/SettingsModal.js';
-import { Settings } from 'lucide-react';
+import { Input } from '../components/ui/input.js';
+import { Label } from '../components/ui/label.js';
+import { Button } from '../components/ui/button.js';
 
 const ERROR_MAP: Record<JoinError['kind'], string> = {
   invalid_name: 'Введите корректный ник',
@@ -47,49 +50,73 @@ export function LobbyView() {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-zinc-950 text-zinc-100">
-      <header className="flex items-center justify-between border-b border-zinc-800 px-6 py-3">
-        <div className="text-lg font-semibold">VoiceChat</div>
-        <button onClick={() => setSettingsOpen(true)} className="rounded p-2 hover:bg-zinc-800" aria-label="Settings">
-          <Settings size={18} />
-        </button>
+    <div className="flex h-screen flex-col bg-bg text-fg">
+      <header className="flex items-center justify-between border-b border-border px-8 py-5">
+        <div className="flex items-baseline gap-3">
+          <span className="font-display text-3xl italic tracking-tight">VoiceChat</span>
+          <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-fg-subtle sm:inline">
+            late · night · studio
+          </span>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Настройки"
+        >
+          <Settings />
+        </Button>
       </header>
 
-      <main className="mx-auto w-full max-w-2xl flex-1 overflow-y-auto p-6">
-        <label className="mb-6 block">
-          <span className="mb-2 block text-sm text-zinc-400">Ваш ник</span>
-          <input
-            type="text"
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 overflow-y-auto px-8 py-10">
+        <section className="flex flex-col gap-2">
+          <Label htmlFor="nick">Ваш ник</Label>
+          <Input
+            id="nick"
             value={prefs.displayName}
             onChange={(e) => onNameChange(e.target.value)}
             maxLength={32}
-            className="w-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 outline-none focus:border-zinc-600"
-            placeholder="Введите ник"
+            placeholder="Как тебя представить"
+            className="text-base"
           />
-        </label>
+        </section>
 
-        <div className="mb-3 text-sm font-medium text-zinc-400">Доступные комнаты</div>
-        {roomsLoading && <div className="text-sm text-zinc-500">Загрузка…</div>}
-        {roomsError && (
-          <div className="rounded border border-red-900 bg-red-950/40 p-3 text-sm text-red-200">
-            Не удаётся подключиться к серверу
+        <section className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between">
+            <Label>Комнаты</Label>
+            {!roomsLoading && (
+              <span className="font-mono text-[10px] tabular-nums text-fg-subtle">
+                {rooms.filter((r) => r.participants.length > 0).length} активн / {rooms.length}
+              </span>
+            )}
           </div>
-        )}
-        <div className="space-y-2">
-          {rooms.map((r) => (
-            <RoomCard
-              key={r.id}
-              room={r}
-              disabled={joining !== null}
-              onJoin={() => onJoin(r.id, r.displayName)}
-            />
-          ))}
-        </div>
+
+          {roomsLoading && (
+            <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-fg-subtle">
+              Загрузка…
+            </div>
+          )}
+          {roomsError && (
+            <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-rose-200">
+              Не удаётся подключиться к серверу
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2.5">
+            {rooms.map((r) => (
+              <RoomCard
+                key={r.id}
+                room={r}
+                disabled={joining !== null}
+                onJoin={() => onJoin(r.id, r.displayName)}
+              />
+            ))}
+          </div>
+        </section>
       </main>
 
       <ToastTray />
-
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 }

@@ -1,11 +1,30 @@
 import { useState } from 'react';
+import { Keyboard } from 'lucide-react';
 import { useStore } from '../state/store.js';
 import { useDeviceList } from '../hooks/useDeviceList.js';
 import type { Prefs } from '../../shared/types.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog.js';
+import { Label } from './ui/label.js';
+import { Switch } from './ui/switch.js';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select.js';
+import { Button } from './ui/button.js';
+import { Separator } from './ui/separator.js';
 
-type Props = { onClose: () => void };
+type Props = { open: boolean; onOpenChange: (open: boolean) => void };
 
-export function SettingsModal({ onClose }: Props) {
+export function SettingsModal({ open, onOpenChange }: Props) {
   const { prefs, setPrefs } = useStore();
   const devices = useDeviceList();
   const [capturing, setCapturing] = useState(false);
@@ -29,127 +48,104 @@ export function SettingsModal({ onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-6" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900 p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 text-lg font-semibold">Настройки</div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Настройки</DialogTitle>
+          <DialogDescription>Устройства, обработка звука, поведение приложения</DialogDescription>
+        </DialogHeader>
 
-        <Field label="Микрофон">
-          <DeviceSelect
+        <Section title="Устройства">
+          <DeviceField
+            label="Микрофон"
             devices={devices.audioInputs}
             value={prefs.audioInputDeviceId}
             onChange={(v) => update({ audioInputDeviceId: v })}
           />
-        </Field>
-        <Field label="Камера">
-          <DeviceSelect
+          <DeviceField
+            label="Камера"
             devices={devices.videoInputs}
             value={prefs.videoInputDeviceId}
             onChange={(v) => update({ videoInputDeviceId: v })}
           />
-        </Field>
-        <Field label="Динамики">
-          <DeviceSelect
+          <DeviceField
+            label="Динамики"
             devices={devices.audioOutputs}
             value={prefs.audioOutputDeviceId}
             onChange={(v) => update({ audioOutputDeviceId: v })}
           />
-        </Field>
+        </Section>
 
-        <div className="my-4 border-t border-zinc-800" />
+        <Separator />
 
-        <Toggle
-          label="Эхоподавление"
-          checked={prefs.audioConstraints.echoCancellation}
-          onChange={(v) =>
-            update({ audioConstraints: { ...prefs.audioConstraints, echoCancellation: v } })
-          }
-        />
-        <Toggle
-          label="Шумоподавление"
-          checked={prefs.audioConstraints.noiseSuppression}
-          onChange={(v) =>
-            update({ audioConstraints: { ...prefs.audioConstraints, noiseSuppression: v } })
-          }
-        />
-        <Toggle
-          label="Авто-регулировка громкости"
-          checked={prefs.audioConstraints.autoGainControl}
-          onChange={(v) =>
-            update({ audioConstraints: { ...prefs.audioConstraints, autoGainControl: v } })
-          }
-        />
+        <Section title="Обработка звука">
+          <Toggle
+            label="Эхоподавление"
+            checked={prefs.audioConstraints.echoCancellation}
+            onChange={(v) =>
+              update({ audioConstraints: { ...prefs.audioConstraints, echoCancellation: v } })
+            }
+          />
+          <Toggle
+            label="Шумоподавление"
+            checked={prefs.audioConstraints.noiseSuppression}
+            onChange={(v) =>
+              update({ audioConstraints: { ...prefs.audioConstraints, noiseSuppression: v } })
+            }
+          />
+          <Toggle
+            label="Авто-громкость"
+            checked={prefs.audioConstraints.autoGainControl}
+            onChange={(v) =>
+              update({ audioConstraints: { ...prefs.audioConstraints, autoGainControl: v } })
+            }
+          />
+        </Section>
 
-        <div className="my-4 border-t border-zinc-800" />
+        <Separator />
 
-        <Toggle
-          label="Push-to-talk"
-          checked={prefs.pushToTalk.enabled}
-          onChange={(v) => update({ pushToTalk: { ...prefs.pushToTalk, enabled: v } })}
-        />
-        {prefs.pushToTalk.enabled && (
-          <div className="mt-2 flex items-center gap-2 text-sm">
-            <span className="text-zinc-400">Клавиша:</span>
-            <button
-              onClick={captureKey}
-              className="rounded border border-zinc-700 px-2 py-1 hover:border-zinc-500"
-            >
-              {capturing ? 'Нажмите клавишу…' : prefs.pushToTalk.key}
-            </button>
-          </div>
-        )}
+        <Section title="Push-to-talk">
+          <Toggle
+            label="Микрофон только при удержании клавиши"
+            checked={prefs.pushToTalk.enabled}
+            onChange={(v) => update({ pushToTalk: { ...prefs.pushToTalk, enabled: v } })}
+          />
+          {prefs.pushToTalk.enabled && (
+            <div className="flex items-center justify-between gap-4 pl-1 pt-1">
+              <span className="text-xs text-fg-muted">Клавиша</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={captureKey}
+                className="font-mono text-xs"
+              >
+                <Keyboard />
+                {capturing ? 'Нажмите клавишу…' : prefs.pushToTalk.key}
+              </Button>
+            </div>
+          )}
+        </Section>
 
-        <div className="my-4 border-t border-zinc-800" />
+        <Separator />
 
-        <Toggle
-          label="Сворачивать в трей при закрытии"
-          checked={prefs.closeToTray}
-          onChange={(v) => update({ closeToTray: v })}
-        />
+        <Section title="Окно">
+          <Toggle
+            label="Сворачивать в трей при закрытии"
+            checked={prefs.closeToTray}
+            onChange={(v) => update({ closeToTray: v })}
+          />
+        </Section>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-        <div className="mt-5 flex justify-end">
-          <button onClick={onClose} className="rounded bg-zinc-100 px-3 py-1 text-sm text-zinc-900">
-            Готово
-          </button>
-        </div>
-      </div>
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Label>{title}</Label>
+      <div className="flex flex-col gap-3">{children}</div>
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="mb-3 block">
-      <span className="mb-1 block text-xs text-zinc-400">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function DeviceSelect({
-  devices,
-  value,
-  onChange,
-}: {
-  devices: MediaDeviceInfo[];
-  value: string | null;
-  onChange: (v: string | null) => void;
-}) {
-  return (
-    <select
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value || null)}
-      className="w-full rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-sm"
-    >
-      <option value="">По умолчанию</option>
-      {devices.map((d) => (
-        <option key={d.deviceId} value={d.deviceId}>
-          {d.label || d.deviceId.slice(0, 8)}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -163,9 +159,44 @@ function Toggle({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="mb-2 flex items-center justify-between text-sm">
-      <span>{label}</span>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-    </label>
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-sm text-fg">{label}</span>
+      <Switch checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+}
+
+function DeviceField({
+  label,
+  devices,
+  value,
+  onChange,
+}: {
+  label: string;
+  devices: MediaDeviceInfo[];
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  const SENTINEL = '__default__';
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs text-fg-muted">{label}</span>
+      <Select
+        value={value ?? SENTINEL}
+        onValueChange={(v) => onChange(v === SENTINEL ? null : v)}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="По умолчанию" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={SENTINEL}>По умолчанию</SelectItem>
+          {devices.map((d) => (
+            <SelectItem key={d.deviceId} value={d.deviceId}>
+              {d.label || d.deviceId.slice(0, 8)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

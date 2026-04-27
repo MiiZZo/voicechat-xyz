@@ -11,6 +11,7 @@ import { ChatPanel } from '../components/ChatPanel.js';
 import { ToastTray } from '../components/Toast.js';
 import { SettingsModal } from '../components/SettingsModal.js';
 import { ChevronLeft, Settings } from 'lucide-react';
+import { Button } from '../components/ui/button.js';
 import type { ScreenSource } from '../../shared/types.js';
 
 export function RoomView() {
@@ -98,22 +99,33 @@ export function RoomView() {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-zinc-950 text-zinc-100">
-      <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">
-        <button onClick={leaveRoom} className="flex items-center gap-1 rounded p-2 text-sm hover:bg-zinc-800">
-          <ChevronLeft size={16} /> {activeRoom.roomName} ({participants.length}/8)
-        </button>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500">{state}</span>
-          <button onClick={() => setSettingsOpen(true)} className="rounded p-2 hover:bg-zinc-800" aria-label="Settings">
-            <Settings size={18} />
-          </button>
+    <div className="flex h-screen flex-col bg-bg text-fg">
+      <header className="flex items-center justify-between border-b border-border bg-bg-elevated/40 px-5 py-3 backdrop-blur">
+        <Button variant="ghost" size="sm" onClick={leaveRoom} className="-ml-2 gap-2">
+          <ChevronLeft />
+          <span className="font-display text-xl italic">{activeRoom.roomName}</span>
+          <span className="font-mono text-xs tabular-nums text-fg-subtle">
+            {participants.length}/8
+          </span>
+        </Button>
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-subtle">
+            {state}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Настройки"
+          >
+            <Settings />
+          </Button>
         </div>
       </header>
 
       <main className="flex flex-1 overflow-hidden">
-        <section className="flex-1 overflow-y-auto p-4">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <section className="flex-1 overflow-y-auto p-5">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             {participants.map((p) => (
               <ParticipantTile
                 key={p.identity}
@@ -145,7 +157,7 @@ export function RoomView() {
 
       <ToastTray />
 
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 }

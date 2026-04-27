@@ -41,7 +41,9 @@ export function ParticipantContextMenu({ participantName, children }: Props) {
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="w-64">
-        <ContextMenuLabel>{participantName}</ContextMenuLabel>
+        <ContextMenuLabel className="font-display text-sm italic normal-case tracking-normal text-fg">
+          {participantName}
+        </ContextMenuLabel>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={(e) => { e.preventDefault(); toggleMute(); }}>
           {muted ? (
@@ -58,9 +60,9 @@ export function ParticipantContextMenu({ participantName, children }: Props) {
         </ContextMenuItem>
         <ContextMenuSeparator />
         <div className="px-2 py-2">
-          <div className="mb-1.5 flex items-center justify-between text-xs text-zinc-400">
+          <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-wider text-fg-muted">
             <span>Громкость</span>
-            <span className="tabular-nums">{Math.round(volume * 100)}%</span>
+            <span className="font-mono tabular-nums text-fg">{Math.round(volume * 100)}%</span>
           </div>
           <Slider
             value={[volume]}

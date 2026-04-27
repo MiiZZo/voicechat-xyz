@@ -5,9 +5,10 @@ import {
   type Participant,
   type TrackPublication,
 } from 'livekit-client';
-import { Mic, MicOff, Video, VideoOff, VolumeX } from 'lucide-react';
+import { Mic, MicOff, VideoOff, VolumeX } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { useStore } from '../state/store.js';
+import { Avatar, AvatarFallback, avatarColor } from './ui/avatar.js';
 import { ParticipantContextMenu } from './ParticipantContextMenu.js';
 
 type Props = {
@@ -27,7 +28,6 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const muted = !p.isLocal && !!prefs?.participantMuted[participantKey];
   const persistedVolume = prefs?.participantVolumes[participantKey];
 
-  // Subscribe to participant track events
   useEffect(() => {
     const events = [
       ParticipantEvent.TrackPublished,
@@ -39,12 +39,9 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       ParticipantEvent.IsSpeakingChanged,
     ] as const;
     events.forEach((e) => p.on(e, rerender));
-    return () => {
-      events.forEach((e) => p.off(e, rerender));
-    };
+    return () => events.forEach((e) => p.off(e, rerender));
   }, [p]);
 
-  // Stable deps for attach effects
   const videoPub = p.getTrackPublication(videoSource);
   const videoTrackSid = videoPub?.trackSid;
   const videoMuted = videoPub?.isMuted;
@@ -52,7 +49,6 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const audioTrackSid = audioPub?.trackSid;
   const audioMuted = audioPub?.isMuted;
 
-  // Attach video track
   useEffect(() => {
     const pub: TrackPublication | undefined = p.getTrackPublication(videoSource);
     const el = videoRef.current;
@@ -64,7 +60,6 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     }
   }, [p, videoSource, videoTrackSid, videoMuted]);
 
-  // Attach remote audio
   useEffect(() => {
     if (p.isLocal) return;
     const pub = p.getTrackPublication(Track.Source.Microphone);
@@ -82,7 +77,6 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     }
   }, [p, audioTrackSid, audioMuted, prefs?.audioOutputDeviceId]);
 
-  // Live volume + mute sync
   useEffect(() => {
     if (p.isLocal) return;
     const el = audioRef.current;
@@ -95,37 +89,69 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const camPub = p.getTrackPublication(videoSource);
   const speaking = p.isSpeaking;
   const showVideo = camPub && !camPub.isMuted;
+  const micOff = !micPub || micPub.isMuted;
+  const camOff = !camPub || camPub.isMuted;
+  const initial = (p.name ?? p.identity).slice(0, 1).toUpperCase();
 
   const tile = (
     <div
       className={cn(
-        'relative flex aspect-video items-center justify-center rounded-lg border bg-zinc-900',
-        speaking ? 'border-emerald-500' : 'border-zinc-800',
+        'group relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border bg-bg-elevated transition-shadow',
+        speaking ? 'border-accent shadow-[0_0_0_1px_hsl(43_96%_56%/0.4)]' : 'border-border',
+        speaking && 'animate-speaking-pulse',
         big && 'col-span-2 row-span-2',
       )}
     >
       {showVideo ? (
         <video
           ref={videoRef}
-          className="h-full w-full rounded-lg object-cover"
+          className="h-full w-full object-cover"
           autoPlay
           playsInline
           muted={p.isLocal}
         />
       ) : (
-        <div className="text-2xl font-semibold text-zinc-500">{p.name?.[0] ?? '?'}</div>
+        <div className="flex flex-col items-center gap-3">
+          <Avatar className={cn('h-16 w-16 shadow-lg', big && 'h-24 w-24')}>
+            <AvatarFallback className={cn('text-2xl font-display italic', avatarColor(participantKey), big && 'text-4xl')}>
+              {initial}
+            </AvatarFallback>
+          </Avatar>
+        </div>
       )}
+
       {!p.isLocal && <audio ref={audioRef} autoPlay />}
-      <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-xs">
-        {!micPub || micPub.isMuted ? <MicOff size={12} /> : <Mic size={12} />}
-        {!camPub || camPub.isMuted ? <VideoOff size={12} /> : <Video size={12} />}
-        <span>{p.name}</span>
-        {muted && <VolumeX size={12} className="ml-1 text-red-400" />}
+
+      {/* Status chips — top right */}
+      <div className="absolute right-2 top-2 flex items-center gap-1">
+        {micOff && (
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-rose-300 backdrop-blur">
+            <MicOff size={12} />
+          </span>
+        )}
+        {camOff && !micOff && showVideo === false && (
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-fg-subtle backdrop-blur">
+            <VideoOff size={12} />
+          </span>
+        )}
+        {muted && (
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-950/80 text-rose-300 backdrop-blur" title="Замьючен локально">
+            <VolumeX size={12} />
+          </span>
+        )}
+      </div>
+
+      {/* Name pill — bottom left */}
+      <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs backdrop-blur">
+        {!micOff && (
+          <Mic size={11} className={cn(speaking ? 'text-accent' : 'text-fg-subtle')} />
+        )}
+        <span className="font-medium text-fg">{p.name}</span>
+        {p.isLocal && <span className="text-fg-subtle">·  ты</span>}
       </div>
     </div>
   );
 
   if (p.isLocal) return tile;
-
   return <ParticipantContextMenu participantName={participantKey}>{tile}</ParticipantContextMenu>;
 }

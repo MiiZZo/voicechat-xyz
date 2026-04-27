@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { RoomEvent, Track, type Room } from 'livekit-client';
-import { Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff } from 'lucide-react';
 import { cn } from '../lib/cn.js';
+import { Button } from './ui/button.js';
+import { Separator } from './ui/separator.js';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.js';
 
 type Props = {
   room: Room;
@@ -24,10 +27,6 @@ export function ControlBar({
 }: Props) {
   const [, force] = useState(0);
 
-  // Subscribe to every room event that could change local mic/cam/share state.
-  // Reading via room-level events (rather than LocalParticipant.on) is the
-  // reliable path: setMicrophoneEnabled emits LocalTrackPublished on the Room,
-  // not always on LocalParticipant.
   useEffect(() => {
     const rerender = () => force((n) => n + 1);
     const events = [
@@ -39,98 +38,120 @@ export function ControlBar({
       RoomEvent.TrackUnpublished,
     ] as const;
     events.forEach((e) => room.on(e, rerender));
-    return () => {
-      events.forEach((e) => room.off(e, rerender));
-    };
+    return () => events.forEach((e) => room.off(e, rerender));
   }, [room]);
 
-  // Derive directly from LiveKit on each render — no local state to drift.
   const lp = room.localParticipant;
-  const micPub = lp.getTrackPublication(Track.Source.Microphone);
-  const camPub = lp.getTrackPublication(Track.Source.Camera);
-  const sharePub = lp.getTrackPublication(Track.Source.ScreenShare);
+  const micOn = !!lp.getTrackPublication(Track.Source.Microphone) && !lp.getTrackPublication(Track.Source.Microphone)!.isMuted;
+  const camOn = !!lp.getTrackPublication(Track.Source.Camera) && !lp.getTrackPublication(Track.Source.Camera)!.isMuted;
+  const localSharing = !!lp.getTrackPublication(Track.Source.ScreenShare);
 
-  const micOn = !!micPub && !micPub.isMuted;
-  const camOn = !!camPub && !camPub.isMuted;
-  const localSharing = !!sharePub;
-
-  const toggleMic = async () => {
-    await lp.setMicrophoneEnabled(!micOn);
-  };
-  const toggleCam = async () => {
-    await lp.setCameraEnabled(!camOn);
-  };
+  const toggleMic = () => void lp.setMicrophoneEnabled(!micOn);
+  const toggleCam = () => void lp.setCameraEnabled(!camOn);
 
   return (
-    <div className="flex items-center justify-center gap-3 border-t border-zinc-800 bg-zinc-950 px-4 py-3">
-      <CtlButton on={micOn} onClick={toggleMic} label="Mic" iconOn={<Mic size={18} />} iconOff={<MicOff size={18} />} />
-      <CtlButton on={camOn} onClick={toggleCam} label="Camera" iconOn={<Video size={18} />} iconOff={<VideoOff size={18} />} />
-      <CtlButton
-        on={localSharing}
-        disabled={!localSharing && remoteSharing}
-        onClick={onToggleScreenShare}
-        label={remoteSharing && !localSharing ? 'Уже идёт демонстрация' : 'Demo'}
-        iconOn={<MonitorUp size={18} />}
-        iconOff={<MonitorUp size={18} />}
-      />
-      {pttEnabled && (
-        <span
-          className={cn(
-            'ml-3 rounded px-2 py-0.5 text-[10px] uppercase tracking-wide',
-            pttHeld ? 'bg-emerald-500 text-emerald-950' : 'bg-zinc-800 text-zinc-400',
-          )}
-        >
-          PTT
-        </span>
-      )}
-      <div className="ml-3 flex items-center gap-0.5">
-        {[0.1, 0.25, 0.45, 0.65, 0.85].map((thr, i) => (
+    <TooltipProvider delayDuration={150}>
+      <div className="flex items-center justify-center gap-2 border-t border-border bg-bg-elevated/80 px-4 py-3 backdrop-blur">
+        <ToolButton
+          label={micOn ? 'Выключить микрофон' : 'Включить микрофон'}
+          active={micOn}
+          icon={micOn ? <Mic /> : <MicOff />}
+          onClick={toggleMic}
+          mutedStyle={!micOn}
+        />
+        <ToolButton
+          label={camOn ? 'Выключить камеру' : 'Включить камеру'}
+          active={camOn}
+          icon={camOn ? <Video /> : <VideoOff />}
+          onClick={toggleCam}
+          mutedStyle={!camOn}
+        />
+        <ToolButton
+          label={
+            localSharing
+              ? 'Остановить демонстрацию'
+              : remoteSharing
+                ? 'Уже идёт демонстрация'
+                : 'Демонстрация экрана'
+          }
+          active={localSharing}
+          disabled={!localSharing && remoteSharing}
+          icon={localSharing ? <MonitorX /> : <MonitorUp />}
+          onClick={onToggleScreenShare}
+        />
+
+        <Separator orientation="vertical" className="mx-2 h-6" />
+
+        <div className="flex items-end gap-0.5" aria-label="Уровень микрофона">
+          {[0.08, 0.2, 0.36, 0.56, 0.78].map((thr, i) => (
+            <span
+              key={i}
+              style={{ height: `${4 + i * 3}px` }}
+              className={cn(
+                'w-[3px] rounded-sm transition',
+                level > thr ? 'bg-accent' : 'bg-bg-muted',
+              )}
+            />
+          ))}
+        </div>
+
+        {pttEnabled && (
           <span
-            key={i}
             className={cn(
-              'h-3 w-1 rounded-sm transition',
-              level > thr ? 'bg-emerald-500' : 'bg-zinc-800',
+              'rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors',
+              pttHeld ? 'bg-accent text-accent-fg' : 'bg-bg-muted text-fg-subtle',
             )}
-          />
-        ))}
+          >
+            PTT
+          </span>
+        )}
+
+        <Separator orientation="vertical" className="mx-2 h-6" />
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="destructive" size="sm" onClick={onLeave} className="gap-2">
+              <PhoneOff />
+              <span>Выйти</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Покинуть комнату</TooltipContent>
+        </Tooltip>
       </div>
-      <button
-        onClick={onLeave}
-        className="ml-4 flex items-center gap-2 rounded-md bg-red-900/80 px-4 py-2 text-sm hover:bg-red-900"
-      >
-        <PhoneOff size={16} /> Выйти
-      </button>
-    </div>
+    </TooltipProvider>
   );
 }
 
-function CtlButton({
-  on,
-  onClick,
+function ToolButton({
   label,
-  iconOn,
-  iconOff,
+  active,
   disabled,
+  icon,
+  onClick,
+  mutedStyle,
 }: {
-  on: boolean;
-  onClick: () => void;
   label: string;
-  iconOn: React.ReactNode;
-  iconOff: React.ReactNode;
+  active: boolean;
   disabled?: boolean;
+  icon: React.ReactNode;
+  onClick: () => void;
+  mutedStyle?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={label}
-      className={cn(
-        'flex h-10 w-10 items-center justify-center rounded-full transition',
-        on ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700',
-        disabled && 'cursor-not-allowed opacity-50',
-      )}
-    >
-      {on ? iconOn : iconOff}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant={active ? 'accent' : 'secondary'}
+          size="icon"
+          disabled={disabled}
+          onClick={onClick}
+          className={cn('rounded-full', mutedStyle && 'text-rose-300/90 hover:text-rose-200')}
+          aria-label={label}
+        >
+          {icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
