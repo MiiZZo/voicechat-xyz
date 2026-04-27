@@ -5,6 +5,7 @@ import { useLiveKitRoom } from '../hooks/useLiveKitRoom.js';
 import { ParticipantTile } from '../components/ParticipantTile.js';
 import { ControlBar } from '../components/ControlBar.js';
 import { ScreenSourcePicker } from '../components/ScreenSourcePicker.js';
+import { ChatPanel } from '../components/ChatPanel.js';
 import { ToastTray } from '../components/Toast.js';
 import { ChevronLeft } from 'lucide-react';
 import type { ScreenSource } from '../../shared/types.js';
@@ -112,6 +113,7 @@ export function RoomView() {
             ))}
           </div>
         </section>
+        {room && <ChatPanel room={room} />}
       </main>
 
       {room && (
