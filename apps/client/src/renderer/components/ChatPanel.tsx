@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { RoomEvent, type Room, type RemoteParticipant } from 'livekit-client';
-import { Send, Copy, ClipboardCopy } from 'lucide-react';
+import { ArrowUp, Copy, ClipboardCopy } from 'lucide-react';
 import { useStore, type ChatMessage } from '../state/store.js';
 import { Avatar, AvatarFallback, avatarColor } from './ui/avatar.js';
 import { Input } from './ui/input.js';
@@ -116,17 +116,24 @@ export function ChatPanel({ room }: { room: Room }) {
         })}
       </div>
 
-      <form onSubmit={send} className="flex items-center gap-2 border-t border-border p-3">
-        <Input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={500}
-          placeholder="Сообщение…"
-          className="h-9"
-        />
-        <Button type="submit" size="icon" aria-label="Отправить" disabled={!text.trim()}>
-          <Send />
-        </Button>
+      <form onSubmit={send} className="border-t border-border p-3">
+        <div className="relative flex items-center">
+          <Input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={500}
+            placeholder="Сообщение…"
+            className="h-10 rounded-full pr-11"
+          />
+          <button
+            type="submit"
+            aria-label="Отправить"
+            disabled={!text.trim()}
+            className="absolute right-1 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-fg transition-colors hover:bg-accent/90 disabled:bg-bg-muted disabled:text-fg-subtle"
+          >
+            <ArrowUp size={18} strokeWidth={2.5} />
+          </button>
+        </div>
       </form>
     </aside>
   );
