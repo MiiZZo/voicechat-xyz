@@ -17,3 +17,4 @@ publish:
   provider: github
   owner: MiiZZo
   repo: voicechat-xyz
+  releaseType: release
