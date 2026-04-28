@@ -6,6 +6,8 @@ import type {
   UpdateStatus,
   FileDownloadRequest,
   FileDownloadResult,
+  ScreenShareRequestPayload,
+  ScreenShareResponsePayload,
 } from '../shared/types.js';
 
 const api = {
@@ -21,6 +23,14 @@ const api = {
   },
   downloadFile: (req: FileDownloadRequest): Promise<FileDownloadResult> =>
     ipcRenderer.invoke(IPC.FileDownload, req),
+  onScreenShareRequest: (cb: (payload: ScreenShareRequestPayload) => void) => {
+    const listener = (_evt: unknown, payload: ScreenShareRequestPayload) => cb(payload);
+    ipcRenderer.on(IPC.ScreenShareRequest, listener);
+    return () => ipcRenderer.removeListener(IPC.ScreenShareRequest, listener);
+  },
+  respondScreenShare: (payload: ScreenShareResponsePayload): void => {
+    ipcRenderer.send(IPC.ScreenShareResponse, payload);
+  },
   window: {
     minimize: (): Promise<void> => ipcRenderer.invoke(IPC.WindowMinimize),
     toggleMaximize: (): Promise<void> => ipcRenderer.invoke(IPC.WindowMaximizeToggle),

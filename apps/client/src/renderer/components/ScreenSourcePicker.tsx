@@ -1,16 +1,13 @@
-import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog.js';
 import type { ScreenSource } from '../../shared/types.js';
 
-type Props = { onPick: (source: ScreenSource) => void; onCancel: () => void };
+type Props = {
+  sources: ScreenSource[];
+  onPick: (source: ScreenSource) => void;
+  onCancel: () => void;
+};
 
-export function ScreenSourcePicker({ onPick, onCancel }: Props) {
-  const [sources, setSources] = useState<ScreenSource[] | null>(null);
-
-  useEffect(() => {
-    window.api.getScreenSources().then(setSources);
-  }, []);
-
+export function ScreenSourcePicker({ sources, onPick, onCancel }: Props) {
   return (
     <Dialog open onOpenChange={(o) => !o && onCancel()}>
       <DialogContent className="max-w-3xl">
@@ -18,7 +15,7 @@ export function ScreenSourcePicker({ onPick, onCancel }: Props) {
           <DialogTitle>Демонстрация экрана</DialogTitle>
           <DialogDescription>Выберите окно или экран для трансляции</DialogDescription>
         </DialogHeader>
-        {!sources ? (
+        {sources.length === 0 ? (
           <div className="py-12 text-center text-sm text-fg-subtle">Загрузка источников…</div>
         ) : (
           <div className="grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto pr-1 md:grid-cols-3">

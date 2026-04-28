@@ -19,6 +19,11 @@ import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ScreenSource } from '../../shared/types.js';
 
+const SCREEN_SHARE_MAX_WIDTH = 2560;
+const SCREEN_SHARE_MAX_HEIGHT = 1440;
+const SCREEN_SHARE_MAX_FPS = 60;
+const SCREEN_SHARE_MAX_BITRATE = 8_000_000;
+
 export function RoomView() {
   const { activeRoom, leaveRoom, prefs } = useStore();
   const { room, state } = useLiveKitRoom();
@@ -28,8 +33,19 @@ export function RoomView() {
   const { qualities, rttMs } = useConnectionQuality(room);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [screenShareParticipant, setScreenShareParticipant] = useState<Participant | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerState, setPickerState] = useState<
+    { requestId: string; sources: ScreenSource[] } | null
+  >(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = window.api.onScreenShareRequest((payload) => {
+      setPickerState({ requestId: payload.requestId, sources: payload.sources });
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     if (!room) return;
@@ -70,27 +86,33 @@ export function RoomView() {
     }
   };
 
-  const startShare = async (source: ScreenSource) => {
+  const startShare = async () => {
     if (!room) return;
-    setPickerOpen(false);
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const stream = await navigator.mediaDevices.getDisplayMedia({
         audio: false,
         video: {
-          // @ts-expect-error chromium-only desktopCapturer constraints
-          mandatory: {
-            chromeMediaSource: 'desktop',
-            chromeMediaSourceId: source.id,
-            maxFrameRate: 30,
-          },
+          width: { ideal: SCREEN_SHARE_MAX_WIDTH },
+          height: { ideal: SCREEN_SHARE_MAX_HEIGHT },
+          frameRate: { ideal: SCREEN_SHARE_MAX_FPS, max: SCREEN_SHARE_MAX_FPS },
         },
       });
       const track = stream.getVideoTracks()[0];
       if (!track) throw new Error('no video track');
+      track.contentHint = 'motion';
+
       await room.localParticipant.publishTrack(track, {
         source: Track.Source.ScreenShare,
         simulcast: false,
+        videoCodec: 'vp8',
+        videoEncoding: {
+          maxBitrate: SCREEN_SHARE_MAX_BITRATE,
+          maxFramerate: SCREEN_SHARE_MAX_FPS,
+          priority: 'high',
+        },
       });
+
       track.addEventListener('ended', () => {
         stopShare();
       });
@@ -102,7 +124,19 @@ export function RoomView() {
   const onToggleScreenShare = () => {
     const localSharing = !!room?.localParticipant.getTrackPublication(Track.Source.ScreenShare);
     if (localSharing) stopShare();
-    else setPickerOpen(true);
+    else startShare();
+  };
+
+  const onPickerPick = (source: ScreenSource) => {
+    if (!pickerState) return;
+    window.api.respondScreenShare({ requestId: pickerState.requestId, sourceId: source.id });
+    setPickerState(null);
+  };
+  const onPickerCancel = () => {
+    if (pickerState) {
+      window.api.respondScreenShare({ requestId: pickerState.requestId, sourceId: null });
+    }
+    setPickerState(null);
   };
 
   return (
@@ -186,8 +220,12 @@ export function RoomView() {
         />
       )}
 
-      {pickerOpen && (
-        <ScreenSourcePicker onPick={startShare} onCancel={() => setPickerOpen(false)} />
+      {pickerState && (
+        <ScreenSourcePicker
+          sources={pickerState.sources}
+          onPick={onPickerPick}
+          onCancel={onPickerCancel}
+        />
       )}
 
       <ToastTray />

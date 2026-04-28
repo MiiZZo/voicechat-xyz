@@ -61,7 +61,18 @@ export const IPC = {
   WindowIsMaximized: 'window:is-maximized',
   WindowMaximizedChanged: 'window:maximized-changed',
   FileDownload: 'file:download',
+  ScreenShareRequest: 'screen-share:request',
+  ScreenShareResponse: 'screen-share:response',
 } as const;
+
+export type ScreenShareRequestPayload = {
+  requestId: string;
+  sources: ScreenSource[];
+};
+export type ScreenShareResponsePayload = {
+  requestId: string;
+  sourceId: string | null;
+};
 
 export type FileDownloadRequest = {
   url: string;

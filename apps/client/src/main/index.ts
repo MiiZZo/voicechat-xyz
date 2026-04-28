@@ -1,11 +1,31 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, desktopCapturer, ipcMain, session, shell } from 'electron';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { IPC } from '../shared/types.js';
+import type {
+  ScreenShareRequestPayload,
+  ScreenShareResponsePayload,
+} from '../shared/types.js';
 import { registerIpc, watchWindowState } from './ipc.js';
 import { setupAutoUpdate } from './updater.js';
 import { setupTray } from './tray.js';
 import { buildAppIconImage } from './icon.js';
 import { getPrefs } from './prefs.js';
+
+app.commandLine.appendSwitch(
+  'enable-features',
+  [
+    'ScreenCaptureKitMac',
+    'WebRtcAllowH264MediaFoundationEncoder',
+  ].join(','),
+);
+app.commandLine.appendSwitch('enable-webrtc-allow-wgc-screen-capturer');
+app.commandLine.appendSwitch('enable-webrtc-allow-wgc-window-capturer');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('force-high-performance-gpu');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,6 +50,7 @@ async function createWindow(): Promise<void> {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      backgroundThrottling: false,
     },
   });
 
@@ -64,10 +85,67 @@ app.on('before-quit', () => {
   isQuitting = true;
 });
 
+function registerDisplayMediaHandler(win: BrowserWindow | null): void {
+  session.defaultSession.setDisplayMediaRequestHandler(
+    async (_request, callback) => {
+      const target = win ?? mainWindow;
+      if (!target || target.isDestroyed()) {
+        callback({});
+        return;
+      }
+      try {
+        const sources = await desktopCapturer.getSources({
+          types: ['screen', 'window'],
+          thumbnailSize: { width: 320, height: 180 },
+          fetchWindowIcons: true,
+        });
+        const requestId = randomUUID();
+        const payload: ScreenShareRequestPayload = {
+          requestId,
+          sources: sources.map((s) => ({
+            id: s.id,
+            name: s.name,
+            thumbnailDataUrl: s.thumbnail.toDataURL(),
+          })),
+        };
+
+        const sourceId = await new Promise<string | null>((resolve) => {
+          const onResponse = (
+            _evt: Electron.IpcMainEvent,
+            resp: ScreenShareResponsePayload,
+          ) => {
+            if (resp.requestId !== requestId) return;
+            ipcMain.removeListener(IPC.ScreenShareResponse, onResponse);
+            resolve(resp.sourceId);
+          };
+          ipcMain.on(IPC.ScreenShareResponse, onResponse);
+          target.webContents.send(IPC.ScreenShareRequest, payload);
+        });
+
+        if (!sourceId) {
+          callback({});
+          return;
+        }
+        const chosen = sources.find((s) => s.id === sourceId);
+        if (!chosen) {
+          callback({});
+          return;
+        }
+        callback({ video: chosen });
+      } catch (err) {
+        console.error('[display-media] handler error', err);
+        callback({});
+      }
+    },
+    { useSystemPicker: process.platform === 'darwin' },
+  );
+}
+
 app.whenReady().then(async () => {
   registerIpc(() => mainWindow);
   await createWindow();
   if (mainWindow) watchWindowState(mainWindow);
+  registerDisplayMediaHandler(mainWindow);
   setupTray({ getWindow: () => mainWindow, onQuit: requestQuit });
   setupAutoUpdate(() => mainWindow);
 
