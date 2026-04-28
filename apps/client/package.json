@@ -5,7 +5,9 @@
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "electron-vite dev --mode local-server",
+    "dev:local": "electron-vite dev --mode local-server",
+    "dev:remote": "electron-vite dev --mode remote-server",
     "icons": "node scripts/generate-icons.mjs",
     "build": "npm run icons && electron-vite build",
     "preview": "electron-vite preview",

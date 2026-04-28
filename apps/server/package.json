@@ -8,17 +8,19 @@
     "dev": "tsx watch --env-file=.env src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "test": "tsx --test test/*.test.ts",
     "lint": "eslint src"
   },
   "dependencies": {
-    "fastify": "^4.28.0",
     "@fastify/cors": "^9.0.0",
-    "livekit-server-sdk": "^2.6.0",
-    "zod": "^3.23.0",
-    "js-yaml": "^4.1.0",
+    "@fastify/multipart": "^8.3.1",
     "chokidar": "^3.6.0",
+    "fastify": "^4.28.0",
+    "js-yaml": "^4.1.0",
+    "livekit-server-sdk": "^2.6.0",
     "pino": "^9.0.0",
-    "pino-pretty": "^11.0.0"
+    "pino-pretty": "^11.0.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.0",

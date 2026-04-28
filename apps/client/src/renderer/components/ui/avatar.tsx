@@ -1,6 +1,16 @@
 import * as React from 'react';
 import * as AvatarPrimitive from '@radix-ui/react-avatar';
 import { cn } from '@/lib/cn';
+import bratokAvatar from '../../assets/avatars/bratok.webp';
+
+/** Maps a (display) name to a custom avatar image URL, or null if no custom one. */
+const CUSTOM_AVATARS: Record<string, string> = {
+  bratok: bratokAvatar,
+};
+
+export function customAvatar(name: string): string | null {
+  return CUSTOM_AVATARS[name.trim().toLowerCase()] ?? null;
+}
 
 const Avatar = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Root>,

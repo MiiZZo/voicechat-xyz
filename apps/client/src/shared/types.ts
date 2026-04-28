@@ -60,4 +60,14 @@ export const IPC = {
   WindowClose: 'window:close',
   WindowIsMaximized: 'window:is-maximized',
   WindowMaximizedChanged: 'window:maximized-changed',
+  FileDownload: 'file:download',
 } as const;
+
+export type FileDownloadRequest = {
+  url: string;
+  suggestedName: string;
+};
+export type FileDownloadResult =
+  | { kind: 'saved'; path: string }
+  | { kind: 'canceled' }
+  | { kind: 'error'; message: string };

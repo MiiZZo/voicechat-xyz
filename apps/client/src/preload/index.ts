@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC } from '../shared/types.js';
-import type { Prefs, ScreenSource, UpdateStatus } from '../shared/types.js';
+import type {
+  Prefs,
+  ScreenSource,
+  UpdateStatus,
+  FileDownloadRequest,
+  FileDownloadResult,
+} from '../shared/types.js';
 
 const api = {
   getPrefs: (): Promise<Prefs> => ipcRenderer.invoke(IPC.GetPrefs),
@@ -13,6 +19,8 @@ const api = {
     ipcRenderer.on(IPC.UpdateStatus, listener);
     return () => ipcRenderer.removeListener(IPC.UpdateStatus, listener);
   },
+  downloadFile: (req: FileDownloadRequest): Promise<FileDownloadResult> =>
+    ipcRenderer.invoke(IPC.FileDownload, req),
   window: {
     minimize: (): Promise<void> => ipcRenderer.invoke(IPC.WindowMinimize),
     toggleMaximize: (): Promise<void> => ipcRenderer.invoke(IPC.WindowMaximizeToggle),

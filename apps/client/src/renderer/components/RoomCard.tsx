@@ -1,6 +1,6 @@
 import { cn } from '../lib/cn.js';
 import type { RoomSummary } from '../lib/api.js';
-import { Avatar, AvatarFallback, avatarColor } from './ui/avatar.js';
+import { Avatar, AvatarFallback, AvatarImage, avatarColor, customAvatar } from './ui/avatar.js';
 
 type Props = { room: RoomSummary; disabled?: boolean; onJoin: () => void };
 
@@ -48,6 +48,9 @@ export function RoomCard({ room, disabled, onJoin }: Props) {
                 key={p.identity}
                 className="h-7 w-7 border-2 border-bg-elevated"
               >
+                {customAvatar(p.name) && (
+                  <AvatarImage src={customAvatar(p.name)!} alt={p.name} />
+                )}
                 <AvatarFallback className={cn('text-[10px] font-medium', avatarColor(p.name))}>
                   {p.name.slice(0, 1).toUpperCase()}
                 </AvatarFallback>

@@ -7,6 +7,8 @@ const ConfigSchema = z.object({
   LIVEKIT_API_SECRET: z.string().min(1),
   ROOMS_FILE: z.string().default('./rooms.yaml'),
   LOG_LEVEL: z.string().default('info'),
+  UPLOAD_DIR: z.string().default('./uploads'),
+  UPLOAD_TTL_HOURS: z.coerce.number().default(24),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

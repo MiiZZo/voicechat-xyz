@@ -1,6 +1,8 @@
-import { BrowserWindow, ipcMain, desktopCapturer } from 'electron';
+import { BrowserWindow, ipcMain, desktopCapturer, dialog, net, app } from 'electron';
+import path from 'node:path';
+import { createWriteStream } from 'node:fs';
 import { IPC } from '../shared/types.js';
-import type { ScreenSource } from '../shared/types.js';
+import type { ScreenSource, FileDownloadRequest, FileDownloadResult } from '../shared/types.js';
 import { getPrefs, setPrefs } from './prefs.js';
 
 export function registerIpc(getWindow: () => BrowserWindow | null): void {
@@ -42,6 +44,54 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     getWindow()?.close();
   });
   ipcMain.handle(IPC.WindowIsMaximized, () => getWindow()?.isMaximized() ?? false);
+
+  ipcMain.handle(
+    IPC.FileDownload,
+    async (_evt, req: FileDownloadRequest): Promise<FileDownloadResult> => {
+      const win = getWindow();
+      if (!win) return { kind: 'error', message: 'no window' };
+      const ext = path.extname(req.suggestedName);
+      const result = await dialog.showSaveDialog(win, {
+        defaultPath: path.join(app.getPath('downloads'), req.suggestedName),
+        filters: ext
+          ? [{ name: ext.slice(1).toUpperCase(), extensions: [ext.slice(1)] }]
+          : undefined,
+      });
+      if (result.canceled || !result.filePath) return { kind: 'canceled' };
+
+      try {
+        await streamToFile(req.url, result.filePath);
+        return { kind: 'saved', path: result.filePath };
+      } catch (err) {
+        return { kind: 'error', message: (err as Error).message };
+      }
+    },
+  );
+}
+
+function streamToFile(url: string, dest: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = net.request(url);
+    request.on('response', (response) => {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        reject(new Error(`HTTP ${response.statusCode}`));
+        return;
+      }
+      const out = createWriteStream(dest);
+      response.on('data', (chunk: Buffer) => out.write(chunk));
+      response.on('end', () => {
+        out.end();
+        out.on('finish', () => resolve());
+        out.on('error', (e) => reject(e));
+      });
+      response.on('error', (e: Error) => {
+        out.destroy();
+        reject(e);
+      });
+    });
+    request.on('error', (err) => reject(err));
+    request.end();
+  });
 }
 
 /** Forwards Electron maximize/unmaximize events to the renderer. */

@@ -44,9 +44,13 @@ services:
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
       ROOMS_FILE: /app/apps/server/rooms.yaml
       LOG_LEVEL: info
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - lobby_uploads:/data/uploads
     depends_on:
       - livekit
 
 volumes:
   caddy_data:
   caddy_config:
+  lobby_uploads:

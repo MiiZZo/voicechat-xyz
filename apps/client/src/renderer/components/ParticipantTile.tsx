@@ -9,7 +9,7 @@ import {
 import { Mic, MicOff, VideoOff, VolumeX, Maximize2 } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { useStore } from '../state/store.js';
-import { Avatar, AvatarFallback, avatarColor } from './ui/avatar.js';
+import { Avatar, AvatarFallback, AvatarImage, avatarColor, customAvatar } from './ui/avatar.js';
 import { ParticipantContextMenu } from './ParticipantContextMenu.js';
 import { QualityIndicator } from './QualityIndicator.js';
 
@@ -280,6 +280,9 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       ) : (
         <div className="flex flex-col items-center gap-3">
           <Avatar className={cn('h-16 w-16 shadow-lg', big && 'h-24 w-24')}>
+            {customAvatar(participantKey) && (
+              <AvatarImage src={customAvatar(participantKey)!} alt={participantKey} />
+            )}
             <AvatarFallback className={cn('text-2xl font-semibold', avatarColor(participantKey), big && 'text-4xl')}>
               {initial}
             </AvatarFallback>
