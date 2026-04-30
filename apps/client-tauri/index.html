@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VoiceChat (Tauri)</title>
+  </head>
+  <body class="dark bg-bg text-fg">
+    <div id="root"></div>
+    <!-- Сначала ставим shim window.api (синхронно), потом грузим renderer.
+         main.tsx ожидает window.api сразу при старте: использовать defer/async нельзя. -->
+    <script type="module" src="/src/preload-shim.ts"></script>
+    <script type="module" src="../client/src/renderer/main.tsx"></script>
+  </body>
+</html>
