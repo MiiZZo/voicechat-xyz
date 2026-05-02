@@ -40,6 +40,8 @@ fn defaults() -> Value {
         "participantMuted": {},
         "initialDeviceState": { "mic": true, "camera": false },
         "closeToTray": true,
+        "screenSharePreset": "smooth",
+        "screenShareCodec": "vp8",
     })
 }
 
@@ -111,12 +113,12 @@ fn deep_fill(merged: &mut Value, defaults: &Value, key: &str) {
     }
 }
 
-fn open_store(app: &AppHandle) -> tauri::Result<std::sync::Arc<Store<Wry>>> {
-    Ok(app.store(STORE_FILE)?)
+fn open_store(app: &AppHandle) -> Result<std::sync::Arc<Store<Wry>>, String> {
+    app.store(STORE_FILE).map_err(|e| e.to_string())
 }
 
 /// Загрузить и нормализовать prefs. Если файла нет — вернёт чистые дефолты.
-pub fn get_prefs(app: &AppHandle) -> tauri::Result<Value> {
+pub fn get_prefs(app: &AppHandle) -> Result<Value, String> {
     let store = open_store(app)?;
     // Все поля держим под одним ключом "prefs" — единственный JSON-объект,
     // который мы реально читаем/пишем. Это упрощает миграцию.
@@ -125,13 +127,13 @@ pub fn get_prefs(app: &AppHandle) -> tauri::Result<Value> {
 }
 
 /// Применить partial-патч и записать результат, как делает setPrefs из prefs.ts.
-pub fn set_prefs(app: &AppHandle, patch: Value) -> tauri::Result<Value> {
+pub fn set_prefs(app: &AppHandle, patch: Value) -> Result<Value, String> {
     let store = open_store(app)?;
     let current = store.get("prefs").unwrap_or_else(|| Value::Object(Map::new()));
     let merged = shallow_merge(current, patch);
     let migrated = migrate(&merged);
     store.set("prefs", migrated.clone());
-    store.save()?;
+    store.save().map_err(|e| e.to_string())?;
     Ok(migrated)
 }
 

@@ -13,12 +13,12 @@ use crate::{prefs, screen_share, updater};
 
 #[tauri::command]
 pub async fn prefs_get(app: AppHandle) -> Result<Value, String> {
-    prefs::get_prefs(&app).map_err(|e| e.to_string())
+    prefs::get_prefs(&app)
 }
 
 #[tauri::command]
 pub async fn prefs_set(app: AppHandle, patch: Value) -> Result<Value, String> {
-    prefs::set_prefs(&app, patch).map_err(|e| e.to_string())
+    prefs::set_prefs(&app, patch)
 }
 
 // === screen sources ==========================================================

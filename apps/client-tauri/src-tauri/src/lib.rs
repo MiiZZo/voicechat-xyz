@@ -45,7 +45,15 @@ pub fn run() {
         ])
         .setup(|app| {
             tray::setup(app.handle())?;
+            // В dev-сборке updater не нужен и только спамит ошибки в лог
+            // (latest-tauri.json пока не опубликован). Запускаем только в release.
+            #[cfg(not(debug_assertions))]
             updater::schedule(app.handle().clone());
+            // В dev-сборке сразу открываем DevTools — нужно для разбора WebRTC-stats.
+            #[cfg(debug_assertions)]
+            if let Some(win) = app.get_webview_window("main") {
+                win.open_devtools();
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
