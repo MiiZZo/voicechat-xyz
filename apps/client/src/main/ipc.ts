@@ -45,6 +45,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   });
   ipcMain.handle(IPC.WindowIsMaximized, () => getWindow()?.isMaximized() ?? false);
 
+  ipcMain.handle(IPC.OpenInternalUrl, async (_evt, url: string) => {
+    if (!/^(chrome|devtools):\/\//.test(url)) return;
+    const win = new BrowserWindow({ width: 1100, height: 800 });
+    await win.loadURL(url);
+  });
+
   ipcMain.handle(
     IPC.FileDownload,
     async (_evt, req: FileDownloadRequest): Promise<FileDownloadResult> => {

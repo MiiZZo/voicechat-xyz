@@ -13,16 +13,24 @@ const TAURI_DEV_PORT = 5174;
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Берём VITE_LOBBY_URL из .env Electron-клиента, чтобы оба клиента были симметричны
-  // и переключение local/remote-server работало одной кнопкой.
-  const env = loadEnv(mode, electronClientRoot, '');
+  // Источник env: сначала свой .env в apps/client-tauri/ (если есть),
+  // затем общие из apps/client/ — так оба клиента симметричны по умолчанию,
+  // но Tauri можно собирать на чистой машине без Electron-пакета.
+  const ownEnv = loadEnv(mode, __dirname, '');
+  const sharedEnv = loadEnv(mode, electronClientRoot, '');
+  const env = { ...sharedEnv, ...ownEnv };
 
   return {
     root: __dirname,
     publicDir: false,
     define: {
+      // Дефолт нарочно указывает на prod, не на localhost. Если CI по любой
+      // причине не пробросит .env (как уже было между v0.1.1 и v0.1.2),
+      // build всё равно соберётся с рабочим URL, а не молча умрёт против
+      // несуществующего localhost:3000. Локальную разработку это не ломает —
+      // .env.local-server в apps/client-tauri/ или apps/client/ перебивает дефолт.
       'import.meta.env.VITE_LOBBY_URL': JSON.stringify(
-        env.VITE_LOBBY_URL ?? 'http://localhost:3000',
+        env.VITE_LOBBY_URL ?? 'https://app.voicechat-xyz.ru',
       ),
     },
     plugins: [react()],
@@ -36,6 +44,9 @@ export default defineConfig(({ mode }) => {
       host: '127.0.0.1',
       port: TAURI_DEV_PORT,
       strictPort: true,
+      // Vite по умолчанию не пускает за пределы workspace root'а; явно разрешаем
+      // чтение из соседнего пакета — там лежит shared renderer.
+      fs: { allow: [__dirname, electronClientRoot] },
     },
     build: {
       outDir: 'dist',

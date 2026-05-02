@@ -7,9 +7,9 @@
   </head>
   <body class="dark bg-bg text-fg">
     <div id="root"></div>
-    <!-- Сначала ставим shim window.api (синхронно), потом грузим renderer.
-         main.tsx ожидает window.api сразу при старте: использовать defer/async нельзя. -->
-    <script type="module" src="/src/preload-shim.ts"></script>
-    <script type="module" src="../client/src/renderer/main.tsx"></script>
+    <!-- Единая entry-точка: shim window.api ставится первым импортом,
+         renderer из ../client поднимается через alias @ — иначе Vite
+         не пускает относительный путь наружу root'а. -->
+    <script type="module" src="/src/entry.ts"></script>
   </body>
 </html>

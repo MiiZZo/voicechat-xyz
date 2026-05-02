@@ -3,7 +3,12 @@ import { HelpCircle, Keyboard } from 'lucide-react';
 import { useStore } from '../state/store.js';
 import { useDeviceList } from '../hooks/useDeviceList.js';
 import { useMicLevelMeter } from '../hooks/useMicLevelMeter.js';
-import type { MicActivationMode, Prefs } from '../../shared/types.js';
+import type {
+  MicActivationMode,
+  Prefs,
+  ScreenShareCodec,
+  ScreenSharePreset,
+} from '../../shared/types.js';
 import { cn } from '../lib/cn.js';
 import {
   Dialog,
@@ -71,93 +76,231 @@ export function SettingsModal({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-5xl">
         <DialogHeader>
           <DialogTitle>Настройки</DialogTitle>
           <DialogDescription>Устройства, обработка звука, поведение приложения</DialogDescription>
         </DialogHeader>
 
-        <Section title="Устройства">
-          <DeviceField
-            label="Микрофон"
-            devices={devices.audioInputs}
-            value={prefs.audioInputDeviceId}
-            onChange={(v) => update({ audioInputDeviceId: v })}
-          />
-          <DeviceField
-            label="Камера"
-            devices={devices.videoInputs}
-            value={prefs.videoInputDeviceId}
-            onChange={(v) => update({ videoInputDeviceId: v })}
-          />
-          <DeviceField
-            label="Динамики"
-            devices={devices.audioOutputs}
-            value={prefs.audioOutputDeviceId}
-            onChange={(v) => update({ audioOutputDeviceId: v })}
-          />
-        </Section>
+        {/* Две независимые колонки. Левая — компактная (устройства + окно),
+            правая — растягивается под VAD-слайдеры если включён. */}
+        <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+          <div className="flex flex-col gap-5">
+            <Section title="Устройства">
+              <DeviceField
+                label="Микрофон"
+                devices={devices.audioInputs}
+                value={prefs.audioInputDeviceId}
+                onChange={(v) => update({ audioInputDeviceId: v })}
+              />
+              <DeviceField
+                label="Камера"
+                devices={devices.videoInputs}
+                value={prefs.videoInputDeviceId}
+                onChange={(v) => update({ videoInputDeviceId: v })}
+              />
+              <DeviceField
+                label="Динамики"
+                devices={devices.audioOutputs}
+                value={prefs.audioOutputDeviceId}
+                onChange={(v) => update({ audioOutputDeviceId: v })}
+              />
+            </Section>
 
-        <Separator />
+            <Separator />
 
-        <Section title="Обработка звука">
-          <Toggle
-            label="Эхоподавление"
-            checked={prefs.audioConstraints.echoCancellation}
-            onChange={(v) =>
-              update({ audioConstraints: { ...prefs.audioConstraints, echoCancellation: v } })
-            }
-          />
-          <Toggle
-            label="Шумоподавление"
-            checked={prefs.audioConstraints.noiseSuppression}
-            onChange={(v) =>
-              update({ audioConstraints: { ...prefs.audioConstraints, noiseSuppression: v } })
-            }
-          />
-          <Toggle
-            label="Авто-громкость"
-            checked={prefs.audioConstraints.autoGainControl}
-            onChange={(v) =>
-              update({ audioConstraints: { ...prefs.audioConstraints, autoGainControl: v } })
-            }
-          />
-        </Section>
+            <Section title="Обработка звука">
+              <Toggle
+                label="Эхоподавление"
+                checked={prefs.audioConstraints.echoCancellation}
+                onChange={(v) =>
+                  update({ audioConstraints: { ...prefs.audioConstraints, echoCancellation: v } })
+                }
+              />
+              <Toggle
+                label="Шумоподавление"
+                checked={prefs.audioConstraints.noiseSuppression}
+                onChange={(v) =>
+                  update({ audioConstraints: { ...prefs.audioConstraints, noiseSuppression: v } })
+                }
+              />
+              <Toggle
+                label="Авто-громкость"
+                checked={prefs.audioConstraints.autoGainControl}
+                onChange={(v) =>
+                  update({ audioConstraints: { ...prefs.audioConstraints, autoGainControl: v } })
+                }
+              />
+            </Section>
 
-        <Separator />
+            <Separator />
 
-        <Section title="Активация микрофона">
-          <ModePicker mode={prefs.micActivationMode} onChange={setMode} />
-          {prefs.micActivationMode === 'ptt' && (
-            <div className="flex items-center justify-between gap-4 pl-1 pt-1">
-              <span className="text-xs text-fg-muted">Клавиша</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={captureKey}
-                className="font-mono text-xs"
-              >
-                <Keyboard />
-                {capturing ? 'Нажмите клавишу…' : prefs.pushToTalk.key}
-              </Button>
-            </div>
-          )}
-          {prefs.micActivationMode === 'vad' && (
-            <VadSection prefs={prefs} update={update} />
-          )}
-        </Section>
+            <Section title="Окно">
+              <Toggle
+                label="Сворачивать в трей при закрытии"
+                checked={prefs.closeToTray}
+                onChange={(v) => update({ closeToTray: v })}
+              />
+            </Section>
+          </div>
 
-        <Separator />
+          <div className="flex flex-col gap-5">
+            <Section title="Активация микрофона">
+              <ModePicker mode={prefs.micActivationMode} onChange={setMode} />
+              {prefs.micActivationMode === 'ptt' && (
+                <div className="flex items-center justify-between gap-4 pl-1 pt-1">
+                  <span className="text-xs text-fg-muted">Клавиша</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={captureKey}
+                    className="font-mono text-xs"
+                  >
+                    <Keyboard />
+                    {capturing ? 'Нажмите клавишу…' : prefs.pushToTalk.key}
+                  </Button>
+                </div>
+              )}
+              {prefs.micActivationMode === 'vad' && (
+                <VadSection prefs={prefs} update={update} />
+              )}
+            </Section>
 
-        <Section title="Окно">
-          <Toggle
-            label="Сворачивать в трей при закрытии"
-            checked={prefs.closeToTray}
-            onChange={(v) => update({ closeToTray: v })}
-          />
-        </Section>
+            <Separator />
+
+            <Section title="Демонстрация экрана">
+              <ScreenSharePresetPicker
+                value={prefs.screenSharePreset}
+                onChange={(v) => update({ screenSharePreset: v })}
+              />
+              <ScreenShareCodecPicker
+                value={prefs.screenShareCodec}
+                onChange={(v) => update({ screenShareCodec: v })}
+              />
+            </Section>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ScreenShareCodecPicker({
+  value,
+  onChange,
+}: {
+  value: ScreenShareCodec;
+  onChange: (v: ScreenShareCodec) => void;
+}) {
+  const options: { value: ScreenShareCodec; label: string }[] = [
+    { value: 'vp8', label: 'VP8' },
+    { value: 'h264', label: 'H264' },
+    { value: 'vp9', label: 'VP9' },
+    { value: 'av1', label: 'AV1' },
+  ];
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs text-fg-muted">Кодек</span>
+      <div
+        role="radiogroup"
+        aria-label="Кодек демонстрации экрана"
+        className="grid grid-cols-4 gap-1 rounded-md bg-bg-muted/50 p-1"
+      >
+        {options.map((opt) => {
+          const active = value === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(opt.value)}
+              className={cn(
+                'rounded-sm px-2 py-1.5 text-xs font-medium transition-colors',
+                active
+                  ? 'bg-bg-elevated text-fg shadow-sm'
+                  : 'text-fg-muted hover:text-fg',
+              )}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ScreenSharePresetPicker({
+  value,
+  onChange,
+}: {
+  value: ScreenSharePreset;
+  onChange: (v: ScreenSharePreset) => void;
+}) {
+  const options: {
+    value: ScreenSharePreset;
+    label: string;
+    sub: string;
+    hint: string;
+  }[] = [
+    {
+      value: 'smooth',
+      label: 'Гладко',
+      sub: '1080p · 60 fps',
+      hint: 'Аппаратный энкодер. Минимум CPU, плавно. Для игр и видео.',
+    },
+    {
+      value: 'sharp',
+      label: 'Чётко',
+      sub: '1440p · 30 fps',
+      hint: 'Аппаратный энкодер. Резкий текст, низкий CPU. Для кода и документов.',
+    },
+    {
+      value: 'max',
+      label: 'Макс',
+      sub: '1440p · 60 fps',
+      hint: 'Программный энкодер (нагрузка на CPU). Полное разрешение и плавность.',
+    },
+  ];
+  return (
+    <TooltipProvider delayDuration={150}>
+      <div
+        role="radiogroup"
+        aria-label="Качество демонстрации экрана"
+        className="grid grid-cols-3 gap-1 rounded-md bg-bg-muted/50 p-1"
+      >
+        {options.map((opt) => {
+          const active = value === opt.value;
+          return (
+            <Tooltip key={opt.value}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => onChange(opt.value)}
+                  className={cn(
+                    'flex flex-col items-center gap-0.5 rounded-sm px-2 py-1 transition-colors',
+                    active
+                      ? 'bg-bg-elevated text-fg shadow-sm'
+                      : 'text-fg-muted hover:text-fg',
+                  )}
+                >
+                  <span className="text-xs font-medium">{opt.label}</span>
+                  <span className="font-mono text-[10px] tabular-nums text-fg-subtle">
+                    {opt.sub}
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[240px] leading-snug">
+                {opt.hint}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+    </TooltipProvider>
   );
 }
 

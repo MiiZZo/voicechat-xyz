@@ -16,10 +16,50 @@ import { getPrefs } from './prefs.js';
 app.commandLine.appendSwitch(
   'enable-features',
   [
+    // Apple ScreenCaptureKit on macOS — replaces legacy CGDisplayStream.
     'ScreenCaptureKitMac',
+    // Hardware H264 via Media Foundation on Windows. Имена флагов в
+    // Chromium менялись по мере миграции с D3D11VideoEncoder на MFT —
+    // включаем все известные варианты, лишние просто игнорируются.
     'WebRtcAllowH264MediaFoundationEncoder',
+    'MediaFoundationH264Encoding',
+    'MediaFoundationH264CbpEncoding',
+    'MediaFoundationVP9Encoding',
+    'MediaFoundationAV1Encoding',
+    'PlatformHEVCEncoderSupport',
+    // Windows Graphics Capture (WGC) — required for high-fps screen
+    // share on Windows 10/11. Without these, Chromium falls back to the
+    // GDI capturer which tops out around 25-30 fps. Names changed
+    // between Chromium versions, so we enable every known variant: old
+    // switch names became features in Chromium ~135, and there's also
+    // a unified umbrella feature.
+    'AllowWgcScreenCapturer',
+    'AllowWgcWindowCapturer',
+    'AllowWgcCapturer',
+    'WebRtcAllowWgcDesktopCapturer',
+    'WebRtcAllowWgcScreenCapturer',
+    'WebRtcAllowWgcWindowCapturer',
   ].join(','),
 );
+// Глушим OpenH264-fallback и screen-content-aware эвристику, которая
+// заставляет WebRTC выбирать софт-энкодер для desktop capture. С RTX 50/40
+// и chrome://gpu, заявляющим NVENC H264 baseline/main/high — должна сработать
+// пара флагов ниже плюс track.contentHint = 'motion' в renderer'е.
+app.commandLine.appendSwitch(
+  'disable-features',
+  [
+    'WebRTCH264WithOpenH264FFmpeg',
+    'WebRtcScreenshareSwEncoding',
+    'WebRtcUseMinMaxVEADimensions',
+  ].join(','),
+);
+// Если HW-энкодер числится в blocklist (старые драйверы / Win10 build) —
+// игнорируем. Если HW реально сломан, упадём в no-op и LiveKit ретрайнет.
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+// Принудительно используем D3D11 ANGLE — на NVIDIA даёт более стабильный
+// MFT path для NVENC. Безопасно для AMD/Intel.
+app.commandLine.appendSwitch('use-angle', 'd3d11');
+// Legacy switch form (Chromium < 135) — harmless on newer builds.
 app.commandLine.appendSwitch('enable-webrtc-allow-wgc-screen-capturer');
 app.commandLine.appendSwitch('enable-webrtc-allow-wgc-window-capturer');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');

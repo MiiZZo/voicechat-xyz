@@ -23,6 +23,9 @@ const defaults: Prefs = {
   participantMuted: {},
   initialDeviceState: { mic: true, camera: false },
   closeToTray: true,
+  screenSharePreset: 'smooth',
+  // VP8 — самый предсказуемый кодек для софт-WebRTC в Electron-Chromium.
+  screenShareCodec: 'vp8',
 };
 
 export const prefsStore = new Store<Prefs>({ name: 'voicechat-prefs', defaults });

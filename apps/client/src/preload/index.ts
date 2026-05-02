@@ -31,6 +31,7 @@ const api = {
   respondScreenShare: (payload: ScreenShareResponsePayload): void => {
     ipcRenderer.send(IPC.ScreenShareResponse, payload);
   },
+  openInternalUrl: (url: string): Promise<void> => ipcRenderer.invoke(IPC.OpenInternalUrl, url),
   window: {
     minimize: (): Promise<void> => ipcRenderer.invoke(IPC.WindowMinimize),
     toggleMaximize: (): Promise<void> => ipcRenderer.invoke(IPC.WindowMaximizeToggle),

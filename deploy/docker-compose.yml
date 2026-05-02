@@ -15,6 +15,7 @@ services:
       LOBBY_DOMAIN: ${LOBBY_DOMAIN}
       LIVEKIT_DOMAIN: ${LIVEKIT_DOMAIN}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      ACME_EMAIL: ${ACME_EMAIL}
     depends_on:
       - lobby
       - livekit

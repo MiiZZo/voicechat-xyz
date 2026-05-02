@@ -8,7 +8,8 @@
     "build": "npm run build -ws --if-present",
     "dev:server": "npm run dev -w @voicechat/server",
     "dev:client": "npm run dev -w @voicechat/client",
-    "dev:client-tauri": "npm run dev -w @voicechat/client-tauri"
+    "dev:client-tauri": "npm run dev -w @voicechat/client-tauri",
+    "dev:client-tauri:remote": "npm run dev:remote -w @voicechat/client-tauri"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

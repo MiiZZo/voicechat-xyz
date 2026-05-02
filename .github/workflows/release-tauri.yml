@@ -58,15 +58,20 @@ jobs:
         run: node scripts/generate-icons.mjs
 
       - name: write vite env
-        # apps/client/.env.local-server гитигнорится, поэтому в CI его нет —
-        # vite.config.ts фолбэкается на http://localhost:3000 и установленный
-        # клиент не находит lobby. Создаём env-файл прямо здесь.
+        # apps/client/.env.local-server гитигнорится, поэтому в CI его нет.
+        # Создаём env-файл явно. Дефолт vite.config.ts тоже указывает на prod
+        # (см. соответствующий коммит) — этот шаг страхует на случай, когда
+        # нужно собрать на staging-URL через repo variable VITE_LOBBY_URL.
         shell: bash
         working-directory: apps/client-tauri
         env:
           VITE_LOBBY_URL: ${{ vars.VITE_LOBBY_URL || 'https://app.voicechat-xyz.ru' }}
         run: |
           printf 'VITE_LOBBY_URL=%s\n' "$VITE_LOBBY_URL" > .env.local-server
+          echo "--- .env.local-server ---"
+          cat .env.local-server
+          echo "--- .env.* listing ---"
+          ls -la .env* || true
 
       - name: build & publish
         uses: tauri-apps/tauri-action@v0
@@ -84,3 +89,27 @@ jobs:
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }}
+
+      - name: assert lobby URL is baked into bundle
+        # Защита от регрессии env-проброса: если в собранном dist/*.js остался
+        # дефолтный localhost-URL — значит env не подхватился, и установщик
+        # выйдет нерабочим. Лучше упасть в CI, чем выпустить мёртвый релиз.
+        shell: bash
+        working-directory: apps/client-tauri
+        env:
+          EXPECTED_URL: ${{ vars.VITE_LOBBY_URL || 'https://app.voicechat-xyz.ru' }}
+        run: |
+          set -e
+          if [ ! -d dist ]; then
+            echo "::error::dist/ not found — vite build did not run"
+            exit 1
+          fi
+          if grep -r --include='*.js' -F 'http://localhost:3000' dist/ ; then
+            echo "::error::localhost:3000 found in built bundle — env was not applied"
+            exit 1
+          fi
+          if ! grep -r --include='*.js' -F "$EXPECTED_URL" dist/ > /dev/null; then
+            echo "::error::expected URL ($EXPECTED_URL) NOT found in bundle"
+            exit 1
+          fi
+          echo "OK: $EXPECTED_URL is baked into bundle"

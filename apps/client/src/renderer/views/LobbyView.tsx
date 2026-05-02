@@ -4,6 +4,7 @@ import { useStore } from '../state/store.js';
 import { useToasts } from '../state/toast-store.js';
 import { usePollRooms } from '../hooks/usePollRooms.js';
 import { postJoin, type JoinError } from '../lib/api.js';
+import { LOBBY_URL } from '../lib/env.js';
 import { RoomCard } from '../components/RoomCard.js';
 import { ToastTray } from '../components/Toast.js';
 import { SettingsModal } from '../components/SettingsModal.js';
@@ -97,7 +98,10 @@ export function LobbyView() {
           )}
           {roomsError && (
             <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-rose-200">
-              Не удаётся подключиться к серверу
+              <div>Не удаётся подключиться к серверу</div>
+              <div className="mt-1 break-all font-mono text-[11px] text-rose-200/70">
+                {LOBBY_URL}
+              </div>
             </div>
           )}
 
