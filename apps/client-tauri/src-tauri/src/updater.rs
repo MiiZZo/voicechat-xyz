@@ -1,9 +1,9 @@
 //! Auto-update. Аналог apps/client/src/main/updater.ts.
 //!
-//! Стратегия фида: tauri-plugin-updater использует **отдельный** endpoint
-//! `latest-tauri.json` рядом с `latest.yml` от electron-updater. Так мы не
-//! ломаем существующий релиз-канал Electron-клиента: оба workflow'а пушат
-//! артефакты в одни и те же GitHub Releases, но читают разные файлы манифеста.
+//! Стратегия фида: tauri-plugin-updater читает `latest.json` (формат tauri-action),
+//! electron-updater — `latest.yml` / `latest-mac.yml` / `latest-linux.yml`. Имена
+//! не пересекаются, поэтому оба workflow'а могут публиковать артефакты в одни и
+//! те же GitHub Releases, не мешая друг другу.
 //!
 //! Двухступенчатая логика "доступно → скачано → установить по кнопке":
 //! tauri-plugin-updater устроен так, что `Update::download` потребляет `self`,
@@ -21,7 +21,7 @@
 
 use serde::Serialize;
 use std::sync::{atomic::AtomicU64, Arc};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
 const STATUS_EVENT: &str = "update:status";
@@ -69,8 +69,12 @@ pub async fn check_and_download(app: AppHandle) -> Result<(), String> {
     let maybe_update = match updater.check().await {
         Ok(u) => u,
         Err(e) => {
-            emit(&app, UpdateStatus::Error { message: e.to_string() });
-            return Err(e.to_string());
+            // Сеть/404/ещё не опубликованный latest-tauri.json — это не Error для UI,
+            // а нормальное «обновлений нет». Electron-клиент трактует update-not-available
+            // так же. Подробности оставляем только в логе.
+            log::info!("[updater] check вернул ошибку, считаем как Idle: {e}");
+            emit(&app, UpdateStatus::Idle);
+            return Ok(());
         }
     };
 

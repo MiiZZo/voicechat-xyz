@@ -20,3 +20,10 @@ apps/client-tauri/src-tauri/gen/
 apps/client-tauri/src-tauri/icons/*.png
 apps/client-tauri/src-tauri/icons/*.ico
 apps/client-tauri/src-tauri/icons/*.icns
+
+# Tauri updater signing keys — приватный ключ ни при каких условиях не должен попасть в репо.
+# Папка `~/` появляется, если `tauri signer generate -w ~/.tauri/...` запустить под Windows
+# (cmd/PowerShell не разворачивает `~`, и ключ ложится прямо внутрь проекта).
+apps/client-tauri/~/
+*.key
+*.key.pub

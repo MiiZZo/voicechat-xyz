@@ -29,13 +29,7 @@
     "security": {
       "csp": null
     },
-    "withGlobalTauri": false,
-    "trayIcon": {
-      "id": "main",
-      "iconPath": "icons/tray.png",
-      "iconAsTemplate": false,
-      "tooltip": "VoiceChat"
-    }
+    "withGlobalTauri": false
   },
   "bundle": {
     "active": true,
@@ -54,9 +48,9 @@
   "plugins": {
     "updater": {
       "active": true,
-      "pubkey": "REPLACE_WITH_BASE64_PUBLIC_KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ2MTg0QzNENkZBMDBFNTQKUldSVURxQnZQVXdZUmlyRkRwUkpTYW0xLzQxdWRJTG1nZjhYN2Q4dmJJV0RUbUNFZ3F6dlphMXkK",
       "endpoints": [
-        "https://github.com/MiiZZo/voicechat-xyz/releases/latest/download/latest-tauri.json"
+        "https://github.com/MiiZZo/voicechat-xyz/releases/latest/download/latest.json"
       ]
     }
   }
