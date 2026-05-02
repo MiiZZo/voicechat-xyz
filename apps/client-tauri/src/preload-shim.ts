@@ -94,6 +94,27 @@ const api = {
 
 (window as unknown as { api: typeof api }).api = api;
 
+// Глобальный link-handler. WebView2 на <a target="_blank"> ничего не делает,
+// поэтому ловим клик в capture-фазе, отменяем дефолт и шлём URL в Rust, где
+// open::that открывает его системным браузером. В Electron-клиенте то же делает
+// main-process через setWindowOpenHandler — здесь повторяем поведение.
+document.addEventListener(
+  'click',
+  (e) => {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const anchor = target.closest('a');
+    if (!anchor) return;
+    const href = anchor.getAttribute('href');
+    if (!href) return;
+    if (!/^https?:\/\//i.test(href)) return;
+    e.preventDefault();
+    void invoke('open_external', { url: href });
+  },
+  // capture: ловим раньше React-handler'ов, чтобы их preventDefault не помешал.
+  true,
+);
+
 export type Api = typeof api;
 declare global {
   interface Window {

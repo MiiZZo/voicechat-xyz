@@ -76,7 +76,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-6xl">
         <DialogHeader>
           <DialogTitle>Настройки</DialogTitle>
           <DialogDescription>Устройства, обработка звука, поведение приложения</DialogDescription>
@@ -84,7 +84,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
 
         {/* Две независимые колонки. Левая — компактная (устройства + окно),
             правая — растягивается под VAD-слайдеры если включён. */}
-        <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-y-5 md:grid-cols-[1fr_1px_1fr] md:gap-x-8">
           <div className="flex flex-col gap-5">
             <Section title="Устройства">
               <DeviceField
@@ -143,6 +143,9 @@ export function SettingsModal({ open, onOpenChange }: Props) {
               />
             </Section>
           </div>
+
+          {/* Вертикальная линия между колонками — на mobile (1 колонка) скрыта. */}
+          <div className="hidden bg-border md:block" aria-hidden />
 
           <div className="flex flex-col gap-5">
             <Section title="Активация микрофона">
@@ -242,65 +245,41 @@ function ScreenSharePresetPicker({
     value: ScreenSharePreset;
     label: string;
     sub: string;
-    hint: string;
   }[] = [
-    {
-      value: 'smooth',
-      label: 'Гладко',
-      sub: '1080p · 60 fps',
-      hint: 'Аппаратный энкодер. Минимум CPU, плавно. Для игр и видео.',
-    },
-    {
-      value: 'sharp',
-      label: 'Чётко',
-      sub: '1440p · 30 fps',
-      hint: 'Аппаратный энкодер. Резкий текст, низкий CPU. Для кода и документов.',
-    },
-    {
-      value: 'max',
-      label: 'Макс',
-      sub: '1440p · 60 fps',
-      hint: 'Программный энкодер (нагрузка на CPU). Полное разрешение и плавность.',
-    },
+    { value: 'smooth', label: 'Плавно', sub: '1080p · 60 fps' },
+    { value: 'sharp', label: 'Чётко', sub: '1440p · 30 fps' },
+    { value: 'max', label: 'Макс', sub: '1440p · 60 fps' },
   ];
   return (
-    <TooltipProvider delayDuration={150}>
-      <div
-        role="radiogroup"
-        aria-label="Качество демонстрации экрана"
-        className="grid grid-cols-3 gap-1 rounded-md bg-bg-muted/50 p-1"
-      >
-        {options.map((opt) => {
-          const active = value === opt.value;
-          return (
-            <Tooltip key={opt.value}>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => onChange(opt.value)}
-                  className={cn(
-                    'flex flex-col items-center gap-0.5 rounded-sm px-2 py-1 transition-colors',
-                    active
-                      ? 'bg-bg-elevated text-fg shadow-sm'
-                      : 'text-fg-muted hover:text-fg',
-                  )}
-                >
-                  <span className="text-xs font-medium">{opt.label}</span>
-                  <span className="font-mono text-[10px] tabular-nums text-fg-subtle">
-                    {opt.sub}
-                  </span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-[240px] leading-snug">
-                {opt.hint}
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
-      </div>
-    </TooltipProvider>
+    <div
+      role="radiogroup"
+      aria-label="Качество демонстрации экрана"
+      className="grid grid-cols-3 gap-1 rounded-md bg-bg-muted/50 p-1"
+    >
+      {options.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              'flex flex-col items-center gap-0.5 rounded-sm px-2 py-1 transition-colors',
+              active
+                ? 'bg-bg-elevated text-fg shadow-sm'
+                : 'text-fg-muted hover:text-fg',
+            )}
+          >
+            <span className="text-xs font-medium">{opt.label}</span>
+            <span className="whitespace-nowrap font-mono text-[10px] tabular-nums text-fg-subtle">
+              {opt.sub}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

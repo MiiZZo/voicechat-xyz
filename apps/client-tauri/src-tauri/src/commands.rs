@@ -116,6 +116,18 @@ pub async fn file_download(
     }
 }
 
+// === open external URL =======================================================
+
+#[tauri::command]
+pub fn open_external(url: String) -> Result<(), String> {
+    // Whitelist схем — открывать произвольные URI (file://, javascript:, и т.д.)
+    // из renderer'а небезопасно. Принимаем только http/https.
+    if !(url.starts_with("http://") || url.starts_with("https://")) {
+        return Err(format!("scheme not allowed: {}", url));
+    }
+    open::that(&url).map_err(|e| e.to_string())
+}
+
 async fn stream_to_file(url: &str, dest: &std::path::Path) -> Result<(), String> {
     use futures_util::StreamExt;
     use tokio::io::AsyncWriteExt;

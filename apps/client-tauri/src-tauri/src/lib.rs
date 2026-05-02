@@ -42,6 +42,7 @@ pub fn run() {
             commands::update_check,
             commands::update_install,
             commands::file_download,
+            commands::open_external,
         ])
         .setup(|app| {
             tray::setup(app.handle())?;

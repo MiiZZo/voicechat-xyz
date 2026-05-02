@@ -28,6 +28,9 @@ futures-util = "0.3"
 uuid = { version = "1", features = ["v4"] }
 log = "0.4"
 env_logger = "0.11"
+# Открытие URL в системном браузере — для глобального link-handler'а
+# в preload-shim (см. open_external команду в commands.rs).
+open = "5"
 
 [features]
 # `custom-protocol` включается tauri-build для production-сборок.
