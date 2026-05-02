@@ -57,6 +57,17 @@ jobs:
         working-directory: apps/client-tauri
         run: node scripts/generate-icons.mjs
 
+      - name: write vite env
+        # apps/client/.env.local-server гитигнорится, поэтому в CI его нет —
+        # vite.config.ts фолбэкается на http://localhost:3000 и установленный
+        # клиент не находит lobby. Создаём env-файл прямо здесь.
+        shell: bash
+        working-directory: apps/client-tauri
+        env:
+          VITE_LOBBY_URL: ${{ vars.VITE_LOBBY_URL || 'https://app.voicechat-xyz.ru' }}
+        run: |
+          printf 'VITE_LOBBY_URL=%s\n' "$VITE_LOBBY_URL" > .env.local-server
+
       - name: build & publish
         uses: tauri-apps/tauri-action@v0
         env:
