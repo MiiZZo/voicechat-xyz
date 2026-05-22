@@ -36,6 +36,9 @@ export function usePushToTalk(room: Room | null): boolean {
       if (isEditableTarget(e.target)) return;
       e.preventDefault();
       if (!e.repeat) {
+        // Master mute override — if the user explicitly muted via control
+        // bar, the PTT key should not unmute. Swallow the event silently.
+        if (useStore.getState().micMutedByUser) return;
         room.localParticipant.setMicrophoneEnabled(true).catch(() => undefined);
         setHeld(true);
       }

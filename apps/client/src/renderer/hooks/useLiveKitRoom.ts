@@ -31,6 +31,7 @@ export type MicPermissionState = 'unknown' | 'granted' | 'denied';
 
 export function useLiveKitRoom() {
   const { activeRoom, prefs, leaveRoom } = useStore();
+  const setMicMutedByUser = useStore((s) => s.setMicMutedByUser);
   const { push } = useToasts();
   const [room, setRoom] = useState<Room | null>(null);
   const [state, setState] = useState<ConnectionState>(ConnectionState.Disconnected);
@@ -99,6 +100,10 @@ export function useLiveKitRoom() {
       try {
         await r.connect(activeRoom.join.livekitUrl, activeRoom.join.token);
         setRoom(r);
+        // Seed the master mute override from the user's saved preference so
+        // the control-bar mic button reflects intent from the first render.
+        // (`leaveRoom` resets it to `false`; we override here for join.)
+        setMicMutedByUser(!prefs.initialDeviceState.mic);
         if (prefs.initialDeviceState.mic) {
           const ok = await tryEnable('mic', () =>
             r.localParticipant.setMicrophoneEnabled(true, {

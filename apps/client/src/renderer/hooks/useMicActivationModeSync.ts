@@ -32,7 +32,10 @@ export function useMicActivationModeSync(room: Room | null): void {
     if (previous === null || previous === mode) return;
     if (mode === 'always' && (previous === 'ptt' || previous === 'vad')) {
       // Coming back from a gated mode — open the mic so the user doesn't
-      // have to click it. Errors (no permission) are surfaced elsewhere.
+      // have to click it. Honor the master mute override though: if the
+      // user is currently muted via the control bar, leave the mic muted.
+      // Errors (no permission) are surfaced elsewhere.
+      if (useStore.getState().micMutedByUser) return;
       room.localParticipant.setMicrophoneEnabled(true).catch(() => undefined);
     }
   }, [room, mode]);

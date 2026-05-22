@@ -38,6 +38,13 @@ type Store = {
   roomsError: string | null;
   activeRoom: { roomId: string; roomName: string; join: JoinResponse } | null;
   chat: ChatMessage[];
+  /**
+   * Master override for the local microphone. When `true`, the user has
+   * explicitly muted the mic via the control bar; activation hooks (VAD/PTT)
+   * MUST NOT call `setMicrophoneEnabled(true)` while this is set. Lives in
+   * runtime state (not prefs) — resets every session.
+   */
+  micMutedByUser: boolean;
 
   setPrefs(prefs: Prefs): void;
   setRooms(rooms: RoomSummary[]): void;
@@ -48,6 +55,7 @@ type Store = {
   pushChat(m: ChatMessage): void;
   /** Patch a chat message in-place (used for upload progress / completion). */
   patchChat(id: string, patch: Partial<FileMessage>): void;
+  setMicMutedByUser(muted: boolean): void;
 };
 
 export const useStore = create<Store>((set) => ({
@@ -58,12 +66,15 @@ export const useStore = create<Store>((set) => ({
   roomsError: null,
   activeRoom: null,
   chat: [],
+  micMutedByUser: false,
   setPrefs: (prefs) => set({ prefs }),
   setRooms: (rooms) => set({ rooms, roomsLoading: false, roomsError: null }),
   setRoomsLoading: (v) => set({ roomsLoading: v }),
   setRoomsError: (err) => set({ roomsError: err, roomsLoading: false }),
   enterRoom: (payload) => set({ view: 'room', activeRoom: payload, chat: [] }),
-  leaveRoom: () => set({ view: 'lobby', activeRoom: null, chat: [] }),
+  // Leaving a room is also a session boundary — un-mute on next join unless
+  // initial-device-state says otherwise (useLiveKitRoom owns that).
+  leaveRoom: () => set({ view: 'lobby', activeRoom: null, chat: [], micMutedByUser: false }),
   pushChat: (m) => set((s) => ({ chat: [...s.chat, m] })),
   patchChat: (id, patch) =>
     set((s) => ({
@@ -71,4 +82,5 @@ export const useStore = create<Store>((set) => ({
         m.id === id && m.kind === 'file' ? ({ ...m, ...patch } as FileMessage) : m,
       ),
     })),
+  setMicMutedByUser: (muted) => set({ micMutedByUser: muted }),
 }));

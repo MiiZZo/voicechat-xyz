@@ -109,6 +109,11 @@ export function useVoiceActivation(room: Room | null): boolean {
       if (next === gateOpen) return;
       gateOpen = next;
       setOpen(next);
+      // Master mute override: when the user has explicitly muted via the
+      // control bar, VAD must not unmute on voice — they want silence. We
+      // still update `gateOpen`/`open` so the UI indicator reflects the gate
+      // state and the release timeout works correctly across mute toggles.
+      if (next && useStore.getState().micMutedByUser) return;
       room.localParticipant.setMicrophoneEnabled(next).catch(() => undefined);
     };
 

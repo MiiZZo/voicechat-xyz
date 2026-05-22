@@ -3,6 +3,7 @@ import { RoomEvent, Track, type Room } from 'livekit-client';
 import { Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import type { MicActivationMode } from '../../shared/types.js';
+import { useStore } from '../state/store.js';
 import { Button } from './ui/button.js';
 import { Separator } from './ui/separator.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.js';
@@ -43,11 +44,32 @@ export function ControlBar({
   }, [room]);
 
   const lp = room.localParticipant;
-  const micOn = !!lp.getTrackPublication(Track.Source.Microphone) && !lp.getTrackPublication(Track.Source.Microphone)!.isMuted;
   const camOn = !!lp.getTrackPublication(Track.Source.Camera) && !lp.getTrackPublication(Track.Source.Camera)!.isMuted;
   const localSharing = !!lp.getTrackPublication(Track.Source.ScreenShare);
 
-  const toggleMic = () => void lp.setMicrophoneEnabled(!micOn);
+  // The mic button represents user intent, not the live LiveKit track state.
+  // In VAD/PTT modes the track gets toggled many times per second by the
+  // activation hooks; binding the button to that state made the icon flicker
+  // and made it impossible to "really" mute (the hook would immediately
+  // unmute again). Source of truth for the button is now the explicit
+  // `micMutedByUser` flag; the activation hooks read it as a master override.
+  const micMutedByUser = useStore((s) => s.micMutedByUser);
+  const setMicMutedByUser = useStore((s) => s.setMicMutedByUser);
+  const micOn = !micMutedByUser;
+
+  const toggleMic = () => {
+    const nextMuted = !micMutedByUser;
+    setMicMutedByUser(nextMuted);
+    if (nextMuted) {
+      // User just muted — force the track off regardless of activation mode.
+      lp.setMicrophoneEnabled(false).catch(() => undefined);
+    } else if (micActivationMode === 'always') {
+      // Un-mute in always-on mode → open the track immediately.
+      lp.setMicrophoneEnabled(true).catch(() => undefined);
+    }
+    // VAD / PTT modes: leave the track muted; the activation hook will
+    // unmute on voice / keypress now that the master override is cleared.
+  };
   const toggleCam = () => void lp.setCameraEnabled(!camOn);
 
   return (
