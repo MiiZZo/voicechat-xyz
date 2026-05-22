@@ -29,3 +29,4 @@ apps/client-tauri/src-tauri/icons/*.icns
 apps/client-tauri/~/
 *.key
 *.key.pub
+.claude
