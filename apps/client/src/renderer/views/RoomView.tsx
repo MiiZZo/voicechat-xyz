@@ -18,6 +18,7 @@ import { TitleBar, titleBarNoDrag } from '../components/TitleBar.js';
 import { ChevronLeft, Settings } from 'lucide-react';
 import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
+import { onLeaveRoom } from '../lib/app-actions.js';
 import type { ScreenSource, ScreenSharePreset } from '../../shared/types.js';
 
 type ScreenShareProfile = {
@@ -63,6 +64,10 @@ export function RoomView() {
     [],
   );
 
+  // Внешние триггеры выхода (трей, глобальный хоткей) — leaveRoom уже стабилен
+  // (zustand action), поэтому подписку привязываем к нему напрямую.
+  useEffect(() => onLeaveRoom(leaveRoom), [leaveRoom]);
+
   useEffect(() => {
     if (!room) return;
     const refresh = () => {
@@ -97,14 +102,20 @@ export function RoomView() {
     if (!room) return;
     shareMonitorRef.current?.();
     shareMonitorRef.current = null;
-    const pub = room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
-    // Захватываем track ДО unpublishTrack — после unpublish LiveKit
-    // отвязывает track от publication и pub.track становится undefined,
-    // обращение к .stop() через pub.track роняется.
-    const track = pub?.track;
-    if (track) {
-      await room.localParticipant.unpublishTrack(track);
-      track.stop();
+    // Чистим оба track'а: видео и аудио (если был — getDisplayMedia может
+    // отдать system audio в Tauri-пути). Захватываем track ДО unpublishTrack —
+    // после unpublish LiveKit отвязывает track от publication и pub.track
+    // становится undefined, обращение к .stop() через pub.track роняется.
+    const lp = room.localParticipant;
+    const videoTrack = lp.getTrackPublication(Track.Source.ScreenShare)?.track;
+    const audioTrack = lp.getTrackPublication(Track.Source.ScreenShareAudio)?.track;
+    if (videoTrack) {
+      await lp.unpublishTrack(videoTrack);
+      videoTrack.stop();
+    }
+    if (audioTrack) {
+      await lp.unpublishTrack(audioTrack);
+      audioTrack.stop();
     }
   };
 
@@ -122,6 +133,10 @@ export function RoomView() {
       // frameRate. На Tauri/WebView2 getScreenSources вернёт пустой массив,
       // тогда падаем в стандартный getDisplayMedia с системным picker.
       let track: MediaStreamTrack | undefined;
+      // Аудио-track системного звука (только Tauri/WebView2 путь, см. ниже).
+      // В Electron путь захватывает только видео — chromeMediaSource audio
+      // нестабилен на Windows и часто требует stereo-mix, не включён по дефолту.
+      let audioTrack: MediaStreamTrack | undefined;
       const sources = await window.api.getScreenSources();
       if (sources.length > 0) {
         const chosen = await new Promise<ScreenSource | null>((resolve) => {
@@ -157,11 +172,17 @@ export function RoomView() {
         // менее производительный capture backend (у юзера это уронило
         // screen-share с ~45 до ~30 fps). frameRate выставляем поздним
         // applyConstraints — для этого пути это работает.
+        //
+        // `audio: true` — WebView2 покажет в picker'е чекбокс "Поделиться
+        // системным звуком". Если юзер отметит → stream.getAudioTracks()
+        // вернёт system-audio loopback (то, что играет в динамики). Если
+        // не отметит — массив пустой, видео всё равно публикуется.
         const stream = await navigator.mediaDevices.getDisplayMedia({
-          audio: false,
+          audio: true,
           video: true,
         });
         track = stream.getVideoTracks()[0];
+        audioTrack = stream.getAudioTracks()[0];
         if (track) {
           try {
             await track.applyConstraints({
@@ -214,6 +235,37 @@ export function RoomView() {
       track.addEventListener('ended', () => {
         stopShare();
       });
+
+      // Если юзер отметил "Поделиться системным звуком" в picker — публикуем
+      // его как отдельный track с source=ScreenShareAudio. LiveKit умеет такие
+      // track'и и автоматически миксует у получателей в их output device.
+      // contentHint='music' подсказывает кодеку приоритизировать full-band
+      // sound над низкой задержкой — для совместного просмотра кино/слушания
+      // музыки важнее качество, а не sub-100ms latency.
+      if (audioTrack) {
+        audioTrack.contentHint = 'music';
+        try {
+          await room.localParticipant.publishTrack(audioTrack, {
+            source: Track.Source.ScreenShareAudio,
+          });
+          // ended на audio-track тоже валит всю шеру: если ОС/юзер отозвали
+          // audio-доступ, видео без звука пусть пользователь выключит сам —
+          // мы только чистим audio-публикацию.
+          audioTrack.addEventListener('ended', () => {
+            const pub = room.localParticipant.getTrackPublication(
+              Track.Source.ScreenShareAudio,
+            );
+            const t = pub?.track;
+            if (t) {
+              void room.localParticipant.unpublishTrack(t);
+            }
+          });
+        } catch (e) {
+          console.warn('[screen-share] publish audio failed', e);
+          // Видео уже опубликовано — продолжаем без аудио, не валим всю шеру.
+          audioTrack.stop();
+        }
+      }
 
       // Health-check: если capture pipeline (WGC под Chromium/WebView2) не
       // успевает за target fps — почти всегда дело в перегруженном источнике

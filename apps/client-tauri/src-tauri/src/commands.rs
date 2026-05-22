@@ -116,6 +116,32 @@ pub async fn file_download(
     }
 }
 
+// === tray ====================================================================
+
+#[tauri::command]
+pub fn set_tray_mic_muted(app: AppHandle, muted: bool) -> Result<(), String> {
+    crate::tray::set_mic_muted(&app, muted)
+}
+
+/// Windows-only: overlay-бэйдж на иконке приложения в панели задач.
+/// На остальных платформах команда — no-op, чтобы фронт не разбирался какая ОС.
+#[tauri::command]
+pub fn set_taskbar_overlay_muted(app: AppHandle, muted: bool) -> Result<(), String> {
+    crate::tray::set_taskbar_overlay_muted(&app, muted)
+}
+
+/// Полный выход из приложения. Вызывается из кастомного tray-menu (пункт
+/// "Выйти"). Перед app.exit ставит quitting=true, иначе close-requested
+/// handler примет это за обычное закрытие main-окна и спрячет его в трей.
+#[tauri::command]
+pub fn app_quit(app: AppHandle) {
+    use std::sync::atomic::Ordering;
+    app.state::<crate::AppState>()
+        .quitting
+        .store(true, Ordering::SeqCst);
+    app.exit(0);
+}
+
 // === open external URL =======================================================
 
 #[tauri::command]

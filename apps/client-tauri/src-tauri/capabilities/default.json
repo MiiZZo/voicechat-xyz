@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions для основного окна VoiceChat (Tauri).",
-  "windows": ["main"],
+  "description": "Permissions для окон VoiceChat (Tauri): main + notification overlay.",
+  "windows": ["main", "notification", "tray-menu"],
   "permissions": [
     "core:default",
     "core:window:allow-minimize",
@@ -15,7 +15,10 @@
     "core:window:allow-hide",
     "core:window:allow-show",
     "core:window:allow-set-focus",
+    "core:window:allow-set-position",
+    "core:window:allow-set-size",
     "core:window:allow-inner-size",
+    "core:window:allow-primary-monitor",
     "core:event:default",
     "store:default",
     "dialog:default",
@@ -23,6 +26,9 @@
     "os:default",
     "process:default",
     "process:allow-restart",
-    "updater:default"
+    "updater:default",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-is-registered"
   ]
 }

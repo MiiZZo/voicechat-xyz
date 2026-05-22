@@ -8,7 +8,16 @@ mod tray;
 mod updater;
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{Emitter, Manager, WindowEvent};
+use tauri::{image::Image, Emitter, Manager, WindowEvent};
+
+// 256×256 PNG для runtime window-icon. Tauri 2 имеет баг (#14596): при
+// загрузке из ICO он использует только entries[0] и игнорирует остальные
+// размеры. Если первым лежит 16×16, Windows вынужден апскейлить на все DPI
+// — отсюда мыло в таскбаре. Поэтому подаём ему single-size PNG в 256×256:
+// Windows downscale'ит HighQualityBicubic'ом до нужного размера на любом DPI.
+// (icon.ico остаётся для bundle-time embedding в .exe — там shell Windows
+// читает все entries корректно для Explorer / Start menu.)
+const WINDOW_ICON: &[u8] = include_bytes!("../icons/128x128@2x.png");
 
 /// Глобальное состояние процесса. Tauri требует Send + Sync.
 pub struct AppState {
@@ -34,6 +43,7 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::prefs_get,
             commands::prefs_set,
@@ -43,9 +53,22 @@ pub fn run() {
             commands::update_install,
             commands::file_download,
             commands::open_external,
+            commands::set_tray_mic_muted,
+            commands::set_taskbar_overlay_muted,
+            commands::app_quit,
         ])
         .setup(|app| {
             tray::setup(app.handle())?;
+            // Явно подменяем window icon с одиночным PNG 256×256 — обходит
+            // Tauri-баг #14596 (HICON строится из первого entry ICO,
+            // 16×16 апскейлится на все DPI = мыло). См. WINDOW_ICON const.
+            if let Some(win) = app.get_webview_window("main") {
+                if let Ok(icon) = Image::from_bytes(WINDOW_ICON) {
+                    if let Err(e) = win.set_icon(icon) {
+                        log::warn!("[icon] set_icon failed: {e}");
+                    }
+                }
+            }
             // В dev-сборке updater не нужен и только спамит ошибки в лог
             // (latest-tauri.json пока не опубликован). Запускаем только в release.
             #[cfg(not(debug_assertions))]

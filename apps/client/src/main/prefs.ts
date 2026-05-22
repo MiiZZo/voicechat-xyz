@@ -26,6 +26,12 @@ const defaults: Prefs = {
   screenSharePreset: 'smooth',
   // VP8 — самый предсказуемый кодек для софт-WebRTC в Electron-Chromium.
   screenShareCodec: 'vp8',
+  soundsEnabled: true,
+  soundsVolume: 0.4,
+  notificationsEnabled: true,
+  notificationPosition: 'bottom-right',
+  globalShortcutToggleMute: 'CommandOrControl+Shift+M',
+  globalShortcutLeaveRoom: '',
 };
 
 export const prefsStore = new Store<Prefs>({ name: 'voicechat-prefs', defaults });

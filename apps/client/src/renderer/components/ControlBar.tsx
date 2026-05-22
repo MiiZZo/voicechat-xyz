@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RoomEvent, Track, type Room } from 'livekit-client';
 import { Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import type { MicActivationMode } from '../../shared/types.js';
 import { useStore } from '../state/store.js';
+import { onToggleMute } from '../lib/app-actions.js';
 import { Button } from './ui/button.js';
 import { Separator } from './ui/separator.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.js';
@@ -56,6 +57,17 @@ export function ControlBar({
   const micMutedByUser = useStore((s) => s.micMutedByUser);
   const setMicMutedByUser = useStore((s) => s.setMicMutedByUser);
   const micOn = !micMutedByUser;
+  // "Действительно транслирует" — для подсветки иконки. В always-on микрофон
+  // транслирует пока юзер сам не выключил. В PTT — только пока удерживается
+  // клавиша. В VAD — только пока VAD-гейт открыт. Идея: подсветка accent (белая)
+  // означает "тебя сейчас слышат"; secondary (серая) — "мик включён, но молчит".
+  // Так юзер по одному взгляду понимает реальное состояние без ошибочного
+  // ощущения "я как будто всегда транслирую".
+  const transmitting =
+    micOn &&
+    (micActivationMode === 'always' ||
+      (micActivationMode === 'ptt' && pttHeld) ||
+      (micActivationMode === 'vad' && vadOpen));
 
   const toggleMic = () => {
     const nextMuted = !micMutedByUser;
@@ -72,12 +84,19 @@ export function ControlBar({
   };
   const toggleCam = () => void lp.setCameraEnabled(!camOn);
 
+  // Внешний триггер (трей, глобальный хоткей) → дёргаем toggleMic. Ref-pattern
+  // нужен потому, что useEffect с пустым deps хранит первую версию замыкания,
+  // а toggleMic читает свежие micMutedByUser/lp/micActivationMode.
+  const toggleMicRef = useRef(toggleMic);
+  toggleMicRef.current = toggleMic;
+  useEffect(() => onToggleMute(() => toggleMicRef.current()), []);
+
   return (
     <TooltipProvider delayDuration={150}>
       <div className="flex items-center justify-center gap-2 border-t border-border bg-bg-elevated/80 px-4 py-3 backdrop-blur">
         <ToolButton
           label={micOn ? 'Выключить микрофон' : 'Включить микрофон'}
-          active={micOn}
+          active={transmitting}
           icon={micOn ? <Mic /> : <MicOff />}
           onClick={toggleMic}
           mutedStyle={!micOn}
@@ -102,32 +121,6 @@ export function ControlBar({
           icon={localSharing ? <MonitorX /> : <MonitorUp />}
           onClick={onToggleScreenShare}
         />
-
-        {micActivationMode !== 'always' && (
-          <Separator orientation="vertical" className="mx-2 h-6" />
-        )}
-
-        {micActivationMode === 'ptt' && (
-          <span
-            className={cn(
-              'rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors',
-              pttHeld ? 'bg-accent text-accent-fg' : 'bg-bg-muted text-fg-subtle',
-            )}
-          >
-            PTT
-          </span>
-        )}
-        {micActivationMode === 'vad' && (
-          <span
-            className={cn(
-              'rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.15em] transition-colors',
-              vadOpen ? 'bg-accent text-accent-fg' : 'bg-bg-muted text-fg-subtle',
-            )}
-            title="Голосовая активация"
-          >
-            VAD
-          </span>
-        )}
 
         <Separator orientation="vertical" className="mx-2 h-6" />
 

@@ -7,6 +7,7 @@ import {
 } from 'livekit-client';
 import { useStore } from '../state/store.js';
 import { useToasts } from '../state/toast-store.js';
+import { playJoin, playLeave } from '../lib/sounds.js';
 
 /** Map DisconnectReason enum → user-facing message. `null` = silent. */
 function describeDisconnect(reason: DisconnectReason | undefined): string | null {
@@ -54,11 +55,20 @@ export function useLiveKitRoom() {
     });
 
     r.on(RoomEvent.ConnectionStateChanged, setState);
+    r.on(RoomEvent.Connected, () => {
+      // Свой вход: один сигнал на сессию. ParticipantConnected ниже
+      // отвечает только за чужие подключения уже после нашего connect.
+      playJoin();
+    });
     r.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
+      // Свой выход (включая кик/таймаут) — последний звук перед чисткой.
+      playLeave();
       const msg = describeDisconnect(reason);
       if (msg) push('error', msg);
       leaveRoom();
     });
+    r.on(RoomEvent.ParticipantConnected, () => playJoin());
+    r.on(RoomEvent.ParticipantDisconnected, () => playLeave());
 
     /** Try to enable a device; if it fails, recover gracefully. */
     const tryEnable = async (

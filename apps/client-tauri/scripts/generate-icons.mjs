@@ -1,204 +1,159 @@
-// Генератор иконок для Tauri-клиента. Логика отрисовки идентична
-// apps/client/scripts/generate-icons.mjs — переиспользуем тот же код через
-// dynamic import, чтобы не дублировать вычисления.
+// Генератор иконок: SVG → PNG (через @resvg/resvg-js) → ICO. SVG — единственный
+// источник правды дизайна, виден человеку и редактируется напрямую. Resvg
+// рендерит с правильным subpixel hinting'ом — иконки чёткие на любом размере
+// без "мыла" от наивного antialias'а, который был в старом pixel-based коде.
 //
 // На выходе кладём:
 //   src-tauri/icons/32x32.png
 //   src-tauri/icons/128x128.png
 //   src-tauri/icons/128x128@2x.png      (256x256)
-//   src-tauri/icons/icon.png            (512x512, fallback для Tauri)
-//   src-tauri/icons/icon.ico
-//   src-tauri/icons/tray.png            (32x32, для tray-icon)
+//   src-tauri/icons/icon.png            (512x512)
+//   src-tauri/icons/icon.ico            (16/24/32/48/64/128/256)
+//   src-tauri/icons/tray.png            (32x32)
+//   src-tauri/icons/tray-muted.png      (32x32)
+//   src-tauri/icons/taskbar-overlay-muted.ico (16/20/24/32/48)
+//   src-tauri/icons/sources/*.svg       (исходники, можно править вручную)
 //
-// .icns не генерируем здесь — Tauri собирает его из icon.png через `tauri icon`.
-// Если он не нужен (Windows-only сборка), можно удалить ссылку на icon.icns
-// из tauri.conf.json. Оставляем для совместимости.
+// .icns не делаем — для Windows-сборки не нужен. macOS — через `cargo tauri icon`.
 
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import zlib from 'node:zlib';
+import { Resvg } from '@resvg/resvg-js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const outDir = resolve(__dirname, '..', 'src-tauri', 'icons');
+const sourcesDir = resolve(outDir, 'sources');
 mkdirSync(outDir, { recursive: true });
+mkdirSync(sourcesDir, { recursive: true });
 
-const BG = { r: 9, g: 9, b: 11 };
-const FG = { r: 255, g: 255, b: 255 };
+// ============================================================================
+// Палитра. ВНИМАНИЕ: должна совпадать с tailwind.config.ts / index.css токенами.
+// ============================================================================
+const BG = 'rgb(9, 9, 11)';        // zinc-950
+const FG = 'rgb(255, 255, 255)';   // white
+const MUTE = 'rgb(244, 63, 94)';   // rose-500
 
-function drawAppIconRgba(size) {
-  const buf = Buffer.alloc(size * size * 4);
-  const radius = Math.max(2, Math.round(size * 0.22));
+// ============================================================================
+// SVG-источники. ViewBox 0..100 — все размеры в "процентах от иконки",
+// resvg сам отскейлит при рендеринге.
+// ============================================================================
 
-  const lineHeight = Math.max(1, Math.round(size * 0.085));
-  const lineGap = Math.max(1, Math.round(size * 0.085));
-  const linesTop = Math.round((size - (3 * lineHeight + 2 * lineGap)) / 2);
-  const linePadX = Math.round(size * 0.22);
-
-  const lines = [
-    { y: linesTop, widthFrac: 0.7 },
-    { y: linesTop + lineHeight + lineGap, widthFrac: 1.0 },
-    { y: linesTop + 2 * (lineHeight + lineGap), widthFrac: 0.55 },
-  ];
-  const lineLeft = linePadX;
-  const lineMaxRight = size - linePadX;
-  const lineMaxWidth = lineMaxRight - lineLeft;
-
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = (y * size + x) * 4;
-      const bgCov = roundedSquareCoverage(x, y, size, size, radius);
-      if (bgCov <= 0) {
-        buf[i + 3] = 0;
-        continue;
-      }
-      let lineCov = 0;
-      for (const line of lines) {
-        const right = lineLeft + Math.round(lineMaxWidth * line.widthFrac);
-        const lineRadius = lineHeight / 2;
-        const inLineY = y + 0.5 >= line.y && y + 0.5 < line.y + lineHeight;
-        if (!inLineY) continue;
-        if (x + 0.5 >= lineLeft + lineRadius && x + 0.5 < right - lineRadius) {
-          lineCov = 1;
-          break;
-        }
-        const cy = line.y + lineHeight / 2;
-        const leftCx = lineLeft + lineRadius;
-        const rightCx = right - lineRadius;
-        const dxL = x + 0.5 - leftCx;
-        const dxR = x + 0.5 - rightCx;
-        const dy = y + 0.5 - cy;
-        const distL = Math.sqrt(dxL * dxL + dy * dy);
-        const distR = Math.sqrt(dxR * dxR + dy * dy);
-        if (x + 0.5 < leftCx && distL <= lineRadius) {
-          lineCov = Math.max(lineCov, smoothstep(distL, lineRadius));
-        } else if (x + 0.5 >= rightCx && distR <= lineRadius) {
-          lineCov = Math.max(lineCov, smoothstep(distR, lineRadius));
-        }
-      }
-      const r = Math.round(BG.r * (1 - lineCov) + FG.r * lineCov);
-      const g = Math.round(BG.g * (1 - lineCov) + FG.g * lineCov);
-      const b = Math.round(BG.b * (1 - lineCov) + FG.b * lineCov);
-      buf[i] = r;
-      buf[i + 1] = g;
-      buf[i + 2] = b;
-      buf[i + 3] = Math.round(255 * bgCov);
-    }
-  }
-  return buf;
+/** App-иконка — оригинальные пропорции из старого pixel-based генератора
+ *  (до всех экспериментов). ViewBox 100×100, скруглённый угол 22%, три
+ *  pill-линии на 70%/100%/55% доступной ширины, вертикально по центру. */
+function svgAppIcon() {
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0"  y="0"     width="100"  height="100" rx="22"   fill="${BG}"/>
+  <rect x="22" y="28.75" width="39.2" height="8.5" rx="4.25" fill="${FG}"/>
+  <rect x="22" y="45.75" width="56"   height="8.5" rx="4.25" fill="${FG}"/>
+  <rect x="22" y="62.75" width="30.8" height="8.5" rx="4.25" fill="${FG}"/>
+</svg>`;
 }
 
-function roundedSquareCoverage(x, y, w, h, r) {
-  let hits = 0;
-  for (let sy = 0; sy < 2; sy++) {
-    for (let sx = 0; sx < 2; sx++) {
-      const px = x + (sx + 0.5) / 2;
-      const py = y + (sy + 0.5) / 2;
-      if (insideRoundedRect(px, py, w, h, r)) hits++;
-    }
-  }
-  return hits / 4;
+/** Tray в состоянии мута: тёмный rounded square + белый микрофон (тело +
+ *  стенд + база) + красная диагональ. Иконка системного трея. */
+function svgTrayMuted() {
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="100" height="100" rx="22" ry="22" fill="${BG}"/>
+  <!-- Mic pill body (capsule = rounded rect с rx = w/2) -->
+  <rect x="34" y="17" width="32" height="42" rx="16" fill="${FG}"/>
+  <!-- Mic stand -->
+  <rect x="46.5" y="62" width="7" height="12" fill="${FG}"/>
+  <!-- Mic base -->
+  <rect x="30" y="74.5" width="40" height="7" rx="2" fill="${FG}"/>
+  <!-- Red diagonal slash -->
+  <line x1="18" y1="22" x2="82" y2="78" stroke="${MUTE}" stroke-width="18" stroke-linecap="round"/>
+</svg>`;
 }
 
-function insideRoundedRect(px, py, w, h, r) {
-  if (px < 0 || py < 0 || px > w || py > h) return false;
-  if (px >= r && px <= w - r) return true;
-  if (py >= r && py <= h - r) return true;
-  const cx = px < r ? r : w - r;
-  const cy = py < r ? r : h - r;
-  const dx = px - cx;
-  const dy = py - cy;
-  return dx * dx + dy * dy <= r * r;
+/** Taskbar-overlay в состоянии мута: красный круг + белый микрофон + тёмная
+ *  диагональ. Маленький бейдж (16-48px), который Windows рисует поверх
+ *  обычной app-иконки в панели задач. */
+function svgOverlayMuted() {
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="50" cy="50" r="49.5" fill="${MUTE}"/>
+  <!-- Mic body — чуть меньше чем у tray, чтобы вписаться в круг -->
+  <rect x="36" y="22" width="28" height="36" rx="14" fill="${FG}"/>
+  <!-- Stand -->
+  <rect x="47" y="60" width="6" height="9" fill="${FG}"/>
+  <!-- Base -->
+  <rect x="33" y="70" width="34" height="6" rx="2" fill="${FG}"/>
+  <!-- Slash тёмная — контраст и с белым mic, и с красным фоном -->
+  <line x1="22" y1="22" x2="78" y2="78" stroke="${BG}" stroke-width="10" stroke-linecap="round"/>
+</svg>`;
 }
 
-function smoothstep(dist, radius) {
-  if (dist <= radius - 0.5) return 1;
-  if (dist >= radius + 0.5) return 0;
-  return radius + 0.5 - dist;
+// ============================================================================
+// SVG → PNG через resvg. Resvg рендерит с subpixel hinting'ом — линии
+// аккуратно ложатся на pixel grid, без мыла. Это ключевое отличие от
+// старого ручного pixel-based кода.
+// ============================================================================
+
+function rasterize(svgString, size) {
+  const resvg = new Resvg(svgString, {
+    fitTo: { mode: 'width', value: size },
+    shapeRendering: 2, // GeometricPrecision — плавные кривые на больших размерах
+    textRendering: 0,
+  });
+  return resvg.render().asPng();
 }
 
-function encodePng(rgba, width, height) {
-  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8;
-  ihdr[9] = 6;
-  ihdr[10] = 0;
-  ihdr[11] = 0;
-  ihdr[12] = 0;
-  const stride = width * 4;
-  const raw = Buffer.alloc(height * (1 + stride));
-  for (let y = 0; y < height; y++) {
-    raw[y * (1 + stride)] = 0;
-    rgba.copy(raw, y * (1 + stride) + 1, y * stride, (y + 1) * stride);
-  }
-  const idat = zlib.deflateSync(raw);
-  return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]);
-}
-
-function chunk(type, data) {
-  const length = Buffer.alloc(4);
-  length.writeUInt32BE(data.length, 0);
-  const typeBuf = Buffer.from(type, 'ascii');
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
-  return Buffer.concat([length, typeBuf, data, crc]);
-}
-
-const CRC_TABLE = (() => {
-  const t = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    t[n] = c >>> 0;
-  }
-  return t;
-})();
-
-function crc32(buf) {
-  let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) c = (CRC_TABLE[(c ^ buf[i]) & 0xff] ?? 0) ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
-}
+// ============================================================================
+// ICO packing. Спецификация: 6-байт header, N×16-байт directory entries,
+// затем raw PNG blocks. Tauri читает ICO через image-ico feature.
+// ============================================================================
 
 function buildIco(entries) {
-  const sorted = [...entries].sort((a, b) => a.size - b.size);
+  // ВАЖНО: первый entry должен быть КРУПНЫМ. Tauri 2 (см. issue #14596) в
+  // runtime читает только entries[0] и из него строит HICON для taskbar /
+  // title-bar / Alt-Tab. Если первым лежит 16×16, Windows вынужден
+  // апскейлить его на все DPI → мыло. С 256-первым Windows downscale'ит
+  // (HighQualityBicubic) — чётко на любом размере. Остальные entries
+  // нужны только для shell'а Explorer'а, который читает ICO целиком.
+  const sorted = [...entries].sort((a, b) => b.size - a.size);
   const count = sorted.length;
   const header = Buffer.alloc(6);
-  header.writeUInt16LE(0, 0);
-  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(0, 0);     // reserved
+  header.writeUInt16LE(1, 2);     // type=ICO
   header.writeUInt16LE(count, 4);
+
   const dirEntrySize = 16;
   let dataOffset = 6 + count * dirEntrySize;
   const directory = Buffer.alloc(count * dirEntrySize);
   const dataBlocks = [];
+
   for (let i = 0; i < sorted.length; i++) {
     const { size, png } = sorted[i];
     const eo = i * dirEntrySize;
-    directory[eo] = size >= 256 ? 0 : size;
-    directory[eo + 1] = size >= 256 ? 0 : size;
-    directory[eo + 2] = 0;
-    directory[eo + 3] = 0;
-    directory.writeUInt16LE(1, eo + 4);
-    directory.writeUInt16LE(32, eo + 6);
-    directory.writeUInt32LE(png.length, eo + 8);
-    directory.writeUInt32LE(dataOffset, eo + 12);
+    directory[eo] = size >= 256 ? 0 : size;       // width (0 = 256)
+    directory[eo + 1] = size >= 256 ? 0 : size;   // height
+    directory[eo + 2] = 0;                         // color count
+    directory[eo + 3] = 0;                         // reserved
+    directory.writeUInt16LE(1, eo + 4);            // color planes
+    directory.writeUInt16LE(32, eo + 6);           // bits per pixel
+    directory.writeUInt32LE(png.length, eo + 8);   // image size
+    directory.writeUInt32LE(dataOffset, eo + 12);  // offset
     dataOffset += png.length;
     dataBlocks.push(png);
   }
   return Buffer.concat([header, directory, ...dataBlocks]);
 }
 
-const sizesForIco = [16, 24, 32, 48, 64, 128, 256];
-const icoPngs = sizesForIco.map((size) => ({
-  size,
-  png: encodePng(drawAppIconRgba(size), size, size),
-}));
+// ============================================================================
+// Output
+// ============================================================================
 
+// Сохраняем исходники SVG — можно открыть в редакторе и поправить дизайн вручную.
+writeFileSync(resolve(sourcesDir, 'app-icon.svg'), svgAppIcon());
+writeFileSync(resolve(sourcesDir, 'tray-muted.svg'), svgTrayMuted());
+writeFileSync(resolve(sourcesDir, 'overlay-muted.svg'), svgOverlayMuted());
+console.log(`wrote sources/*.svg (3 files)`);
+
+// App icon — PNG разных размеров + multi-res ICO.
+const appIconSvg = svgAppIcon();
 const make = (size, name) => {
-  const png = encodePng(drawAppIconRgba(size), size, size);
-  writeFileSync(resolve(outDir, name), png);
+  writeFileSync(resolve(outDir, name), rasterize(appIconSvg, size));
   console.log(`wrote ${name} (${size}x${size})`);
 };
 
@@ -208,12 +163,36 @@ make(256, '128x128@2x.png');
 make(512, 'icon.png');
 make(32, 'tray.png');
 
-writeFileSync(resolve(outDir, 'icon.ico'), buildIco(icoPngs));
-console.log(`wrote icon.ico (${sizesForIco.length} resolutions)`);
+// icon.ico — стандартный набор Windows-размеров. Windows shell сам выберет
+// нужный для каждого DPI (16 для 100%, 32 для 200%, и т.д.).
+{
+  const sizes = [16, 24, 32, 48, 64, 128, 256];
+  const pngs = sizes.map((size) => ({ size, png: rasterize(appIconSvg, size) }));
+  writeFileSync(resolve(outDir, 'icon.ico'), buildIco(pngs));
+  console.log(`wrote icon.ico (${sizes.length} resolutions)`);
+}
 
-// .icns: пишем заглушку (1x1 png) — реальный icns требует libicns / парсинг
-// Apple-формата. Tauri на Windows-сборке его не использует. Если нужен macOS
-// релиз — генерация через `cargo tauri icon ./icon.png`.
-const stubIcnsPng = encodePng(drawAppIconRgba(16), 16, 16);
-writeFileSync(resolve(outDir, 'icon.icns'), stubIcnsPng);
-console.log('wrote icon.icns (placeholder; используйте `cargo tauri icon` для macOS-сборки)');
+// Tray в muted-состоянии — отдельный PNG 32×32 (трей системы рисует именно
+// такой размер на стандартном DPI Windows).
+{
+  writeFileSync(resolve(outDir, 'tray-muted.png'), rasterize(svgTrayMuted(), 32));
+  console.log(`wrote tray-muted.png (32x32)`);
+}
+
+// Taskbar overlay в muted-состоянии — multi-res ICO. Windows подберёт размер
+// под текущий DPI: 100% → 16, 125% → 20, 150% → 24, 200% → 32.
+{
+  const sizes = [16, 20, 24, 32, 48];
+  const overlaySvg = svgOverlayMuted();
+  const pngs = sizes.map((size) => ({ size, png: rasterize(overlaySvg, size) }));
+  writeFileSync(resolve(outDir, 'taskbar-overlay-muted.ico'), buildIco(pngs));
+  console.log(`wrote taskbar-overlay-muted.ico (${sizes.length} resolutions)`);
+}
+
+// .icns: пишем 1×1 заглушку — нужна только для macOS-сборки, которая идёт
+// отдельным маршрутом `cargo tauri icon`. Tauri требует чтобы файл существовал.
+{
+  const stub = rasterize(svgAppIcon(), 16);
+  writeFileSync(resolve(outDir, 'icon.icns'), stub);
+  console.log(`wrote icon.icns (placeholder; используйте \`cargo tauri icon\` для macOS-сборки)`);
+}

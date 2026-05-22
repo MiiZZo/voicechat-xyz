@@ -14,6 +14,7 @@ import {
 import { useToasts } from '../state/toast-store.js';
 import { cn } from '../lib/cn.js';
 import { uploadFile } from '../lib/upload.js';
+import { notifyChatMessage } from '../lib/notifications.js';
 
 const MAX_BYTES = 50 * 1024 * 1024;
 
@@ -88,6 +89,9 @@ export function ChatPanel({ room }: { room: Room }) {
             text: msg.text,
             timestamp: msg.timestamp,
           });
+          // Системное уведомление — само решит, показывать ли (только если
+          // окно вне фокуса) и спросит permission при первом вызове.
+          void notifyChatMessage({ fromName, body: msg.text });
         } else if (msg.type === 'file') {
           pushChat({
             kind: 'file',
@@ -102,6 +106,7 @@ export function ChatPanel({ room }: { room: Room }) {
             mime: msg.mime,
             status: 'done',
           });
+          void notifyChatMessage({ fromName, body: `📎 ${msg.name}` });
         }
       } catch {
         /* ignore */

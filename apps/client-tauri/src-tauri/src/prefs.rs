@@ -42,6 +42,12 @@ fn defaults() -> Value {
         "closeToTray": true,
         "screenSharePreset": "smooth",
         "screenShareCodec": "vp8",
+        "soundsEnabled": true,
+        "soundsVolume": 0.4,
+        "notificationsEnabled": true,
+        "notificationPosition": "bottom-right",
+        "globalShortcutToggleMute": "CommandOrControl+Shift+M",
+        "globalShortcutLeaveRoom": "",
     })
 }
 

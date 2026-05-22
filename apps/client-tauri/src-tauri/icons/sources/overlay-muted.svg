@@ -1,0 +1,11 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="50" cy="50" r="49.5" fill="rgb(244, 63, 94)"/>
+  <!-- Mic body — чуть меньше чем у tray, чтобы вписаться в круг -->
+  <rect x="36" y="22" width="28" height="36" rx="14" fill="rgb(255, 255, 255)"/>
+  <!-- Stand -->
+  <rect x="47" y="60" width="6" height="9" fill="rgb(255, 255, 255)"/>
+  <!-- Base -->
+  <rect x="33" y="70" width="34" height="6" rx="2" fill="rgb(255, 255, 255)"/>
+  <!-- Slash тёмная — контраст и с белым mic, и с красным фоном -->
+  <line x1="22" y1="22" x2="78" y2="78" stroke="rgb(9, 9, 11)" stroke-width="10" stroke-linecap="round"/>
+</svg>

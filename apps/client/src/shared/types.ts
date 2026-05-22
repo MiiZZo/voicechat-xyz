@@ -57,7 +57,22 @@ export type Prefs = {
   closeToTray: boolean;
   screenSharePreset: ScreenSharePreset;
   screenShareCodec: ScreenShareCodec;
+  /** Master switch для системных звуков (join/leave/notify). false = тишина. */
+  soundsEnabled: boolean;
+  /** Громкость системных звуков, 0..1. Применяется ко всем play* функциям. */
+  soundsVolume: number;
+  /** Показывать ли тост-уведомления о входящих сообщениях в фоне. */
+  notificationsEnabled: boolean;
+  /** Позиция notification-окна на экране. */
+  notificationPosition: NotificationCorner;
+  /** Глобальные хоткеи. Формат — Tauri accelerator: "CommandOrControl+Shift+M".
+   *  Пустая строка = отключено. Работают даже когда окно не в фокусе. */
+  globalShortcutToggleMute: string;
+  globalShortcutLeaveRoom: string;
 };
+
+/** Какой угол primary monitor'а используется для notification-окна. */
+export type NotificationCorner = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
 export type ScreenSource = {
   id: string;
