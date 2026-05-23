@@ -6,7 +6,7 @@ import {
   type Participant,
   type TrackPublication,
 } from 'livekit-client';
-import { Mic, MicOff, VideoOff, VolumeX, Maximize2 } from 'lucide-react';
+import { Mic, MicOff, VideoOff, VolumeX, Maximize2, Monitor } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { useStore } from '../state/store.js';
 import { Avatar, AvatarFallback, AvatarImage, avatarColor, customAvatar } from './ui/avatar.js';
@@ -487,6 +487,9 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
 
       {/* Name pill — bottom left */}
       <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs backdrop-blur">
+        {videoSource === Track.Source.ScreenShare && (
+          <Monitor size={11} className="text-fg-subtle" aria-label="Демонстрация экрана" />
+        )}
         {!micOff && (
           <Mic size={11} className={cn(speaking ? 'text-fg' : 'text-fg-subtle')} />
         )}
