@@ -387,19 +387,25 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     }
   }, [p, screenMuted, persistedScreenVolume, screenAudioGraphTick]);
 
-  // AudioContext may start suspended in Electron until first user gesture.
-  // Resume on the next pointer/key event.
+  // AudioContexts may start suspended in Electron until first user gesture.
+  // Resume both mic and screen-share contexts on the next pointer/key event.
   useEffect(() => {
-    const ctx = audioCtxRef.current;
-    if (!ctx || ctx.state !== 'suspended') return;
-    const resume = () => ctx.resume().catch(() => undefined);
+    const micCtx = audioCtxRef.current;
+    const screenCtx = screenAudioCtxRef.current;
+    const needsMic = micCtx && micCtx.state === 'suspended';
+    const needsScreen = screenCtx && screenCtx.state === 'suspended';
+    if (!needsMic && !needsScreen) return;
+    const resume = () => {
+      if (needsMic) micCtx.resume().catch(() => undefined);
+      if (needsScreen) screenCtx.resume().catch(() => undefined);
+    };
     window.addEventListener('pointerdown', resume, { once: true });
     window.addEventListener('keydown', resume, { once: true });
     return () => {
       window.removeEventListener('pointerdown', resume);
       window.removeEventListener('keydown', resume);
     };
-  }, [audioGraphTick]);
+  }, [audioGraphTick, screenAudioGraphTick]);
 
   const micPub = p.getTrackPublication(Track.Source.Microphone);
   const camPub = p.getTrackPublication(videoSource);
