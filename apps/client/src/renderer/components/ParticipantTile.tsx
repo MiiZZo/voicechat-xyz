@@ -38,14 +38,13 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   // Полностью независим от микрофонного: свой AudioContext, GainNode, source.
   // Зачем отдельный AudioContext: ставить sinkId на ctx можно один раз, и
   // переключение output device не должно дёргать гейн микрофонного графа.
-  /* eslint-disable @typescript-eslint/no-unused-vars */
   const screenAudioCtxRef = useRef<AudioContext | null>(null);
   const screenGainNodeRef = useRef<GainNode | null>(null);
   const screenSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const screenSourceStreamIdRef = useRef<string | null>(null);
   const screenAudioRef = useRef<HTMLAudioElement | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [screenAudioGraphTick, setScreenAudioGraphTick] = useState(0);
-  /* eslint-enable @typescript-eslint/no-unused-vars */
   const { prefs } = useStore();
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
@@ -96,12 +95,11 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const audioMuted = audioPub?.isMuted;
   const audioTrackReady = !!audioPub?.track;
   const screenAudioPub = p.getTrackPublication(Track.Source.ScreenShareAudio);
-  /* eslint-disable @typescript-eslint/no-unused-vars */
   const screenAudioTrackSid = screenAudioPub?.trackSid;
   const screenAudioMuted = screenAudioPub?.isMuted;
   const screenAudioTrackReady = !!screenAudioPub?.track;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const hasScreenShareAudio = !!screenAudioPub;
-  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   useEffect(() => {
     const pub: TrackPublication | undefined = p.getTrackPublication(videoSource);
@@ -209,6 +207,91 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       track.detach(el);
     };
   }, [p, audioTrackSid, audioMuted, audioTrackReady, prefs?.audioOutputDeviceId]);
+
+  // Параллельный к микрофонному пути attach-эффект для ScreenShareAudio.
+  // Структурно делает то же самое: attach к скрытому <audio> чтобы LiveKit
+  // прокачал поток, force-mute элемента, реальный звук через WebAudio с
+  // независимым GainNode (для громкости 0..200% и индивидуального mute).
+  useEffect(() => {
+    if (p.isLocal) return;
+    const pub = p.getTrackPublication(Track.Source.ScreenShareAudio);
+    const track = pub?.track;
+    const el = screenAudioRef.current;
+    if (!track || !el) return;
+
+    track.attach(el);
+    el.muted = true;
+    el.volume = 0;
+
+    let ctx = screenAudioCtxRef.current;
+    if (!ctx) {
+      try {
+        ctx = new AudioContext();
+        screenAudioCtxRef.current = ctx;
+      } catch {
+        // Web Audio недоступен — fallback на нативный <audio>.
+        el.muted = false;
+        el.volume = 1;
+        return () => {
+          track.detach(el);
+        };
+      }
+    }
+
+    let gain = screenGainNodeRef.current;
+    if (!gain) {
+      gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      screenGainNodeRef.current = gain;
+    }
+
+    // Пересобираем MediaStreamAudioSourceNode при смене underlying MediaStreamTrack
+    // (resubscribe, republish и т.п. меняют идентичность track'а).
+    const mst = track.mediaStreamTrack;
+    if (mst) {
+      const streamId = mst.id;
+      if (screenSourceStreamIdRef.current !== streamId) {
+        try {
+          screenSourceNodeRef.current?.disconnect();
+        } catch {
+          // already disconnected
+        }
+        try {
+          const stream = new MediaStream([mst]);
+          const source = ctx.createMediaStreamSource(stream);
+          source.connect(gain);
+          screenSourceNodeRef.current = source;
+          screenSourceStreamIdRef.current = streamId;
+          // Bump tick — заставляет gain-effect перенакатить громкость.
+          setScreenAudioGraphTick((n) => n + 1);
+        } catch {
+          // Если не получилось — fallback на нативное воспроизведение.
+          el.muted = false;
+          el.volume = 1;
+        }
+      }
+    }
+
+    ctx.resume().catch(() => undefined);
+
+    const deviceId = prefs?.audioOutputDeviceId;
+    if (deviceId) {
+      const ctxWithSink = ctx as AudioContext & {
+        setSinkId?: (id: string) => Promise<void>;
+      };
+      if (typeof ctxWithSink.setSinkId === 'function') {
+        ctxWithSink.setSinkId(deviceId).catch(() => undefined);
+      } else if ('setSinkId' in HTMLMediaElement.prototype) {
+        (el as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> })
+          .setSinkId(deviceId)
+          .catch(() => undefined);
+      }
+    }
+
+    return () => {
+      track.detach(el);
+    };
+  }, [p, screenAudioTrackSid, screenAudioMuted, screenAudioTrackReady, prefs?.audioOutputDeviceId]);
 
   // Tear down Web Audio graph on unmount.
   useEffect(() => {
