@@ -427,6 +427,12 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     <div
       ref={tileRef}
       onDoubleClick={(e) => showVideo && requestFullscreen(e)}
+      // WebkitAppRegion: 'no-drag' — критично для fullscreen режима screen-share
+      // тайла. В нормальном режиме тайл и так не в drag-region, но в fullscreen
+      // тайл занимает весь экран поверх TitleBar (app-region: drag живёт в DOM
+      // на y=0..36). Без явного no-drag клики/драги на кнопках и слайдере overlay
+      // в этой полосе уходят OS-level window-drag-handler'у и двигают окно.
+      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       className={cn(
         'group relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border bg-bg-elevated transition-shadow',
         speaking ? 'border-accent/80 shadow-[0_0_0_1px_hsl(0_0%_100%/0.3)]' : 'border-border',

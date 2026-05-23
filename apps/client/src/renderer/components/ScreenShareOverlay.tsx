@@ -91,12 +91,17 @@ export function ScreenShareOverlay({
 
   return (
     <>
-      {/* right-12 keeps the panel clear of status chips pinned at right-2 in the parent tile */}
+      {/* right-12 keeps the panel clear of status chips pinned at right-2 in the parent tile.
+          WebkitAppRegion: 'no-drag' нужен потому, что в fullscreen tile div занимает весь
+          экран, а TitleBar (с app-region: drag) всё ещё в DOM на y=0..36px. OS-level
+          hit-test для window-drag захватывает pointer events на overlay, расположенном
+          в этой полосе. no-drag вычитает overlay из drag-region. */}
       <div
         className={
           'absolute right-12 top-2 flex items-center gap-2 rounded-md bg-black/60 px-2 py-1.5 backdrop-blur ' +
           'opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100'
         }
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
       >
