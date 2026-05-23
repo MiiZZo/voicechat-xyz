@@ -52,7 +52,15 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const requestFullscreen = (e?: React.MouseEvent | React.SyntheticEvent) => {
     e?.stopPropagation();
     e?.preventDefault();
-    const target = videoRef.current ?? tileRef.current;
+    // Для screen-share тайла фуллскриним tile div, а не сам <video>, чтобы
+    // overlay (PiP / громкость / fps) и name pill остались видны внутри
+    // fullscreen-элемента. Если фуллскринить только video, его сиблинги
+    // пропадают из DOM-видимости (так делает спека Fullscreen API).
+    // Для камеры — оставляем video как было: лишних контролов там нет.
+    const isScreenShare = videoSource === Track.Source.ScreenShare;
+    const target = isScreenShare
+      ? (tileRef.current ?? videoRef.current)
+      : (videoRef.current ?? tileRef.current);
     if (!target) return;
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => undefined);

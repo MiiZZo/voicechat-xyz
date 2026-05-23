@@ -26,6 +26,12 @@
 
   ::selection { background: hsl(0 0% 100% / 0.18); color: hsl(0 0% 98%); }
 
+  /* Когда tile div уходит в fullscreen (для screen-share тайла), видео внутри
+     должно letterbox'иться, а не кропать — повторяет дефолтное поведение
+     браузера для native <video>-fullscreen. Без этого правила object-cover
+     обрезает демку с не совпадающим aspect ratio. */
+  :fullscreen video { object-fit: contain; }
+
   *::-webkit-scrollbar { width: 6px; height: 6px; }
   *::-webkit-scrollbar-track { background: transparent; }
   *::-webkit-scrollbar-thumb { background: hsl(240 4% 16%); border-radius: 3px; }
