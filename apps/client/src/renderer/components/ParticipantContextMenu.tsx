@@ -77,7 +77,7 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
           }}
           className="[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0"
         >
-          {muted ? <Volume2 /> : <VolumeX />}
+          {muted ? <VolumeX /> : <Volume2 />}
           <span>{muted ? 'Включить звук' : 'Отключить звук'}</span>
         </ContextMenuItem>
         <div className="flex items-center gap-3 px-2 py-2">
@@ -109,7 +109,7 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
               }}
               className="[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0"
             >
-              {screenMuted ? <Volume2 /> : <VolumeX />}
+              {screenMuted ? <VolumeX /> : <Volume2 />}
               <span>{screenMuted ? 'Включить звук' : 'Отключить звук'}</span>
             </ContextMenuItem>
             <div className="flex items-center gap-3 px-2 py-2">
