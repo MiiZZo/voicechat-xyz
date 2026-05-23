@@ -314,6 +314,27 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     };
   }, []);
 
+  // Teardown для screen-share WebAudio графа при размонтировании тайла.
+  useEffect(() => {
+    return () => {
+      try {
+        screenSourceNodeRef.current?.disconnect();
+      } catch {
+        // ignore
+      }
+      try {
+        screenGainNodeRef.current?.disconnect();
+      } catch {
+        // ignore
+      }
+      screenAudioCtxRef.current?.close().catch(() => undefined);
+      screenSourceNodeRef.current = null;
+      screenSourceStreamIdRef.current = null;
+      screenGainNodeRef.current = null;
+      screenAudioCtxRef.current = null;
+    };
+  }, []);
+
   // Apply volume + mute to the GainNode. Runs on every prefs change and
   // every time the audio graph is (re)built.
   useEffect(() => {
