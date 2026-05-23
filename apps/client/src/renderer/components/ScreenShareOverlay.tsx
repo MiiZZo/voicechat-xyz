@@ -16,10 +16,12 @@ type Props = {
  * Полупрозрачная панель в правом верхнем углу большого тайла шарера.
  * Скрыта по умолчанию, показывается при group-hover родителя или focus-within.
  *
- * Содержит:
- *  - mini-slider громкости screen-share audio + mute (только если hasScreenShareAudio)
- *  - кнопку Picture-in-Picture
- *  - индикатор fps / bitrate
+ * Контролы зависят от режима:
+ *  - В обычном (windowed) режиме — только кнопка Picture-in-Picture.
+ *    Громкость и mute доступны через RMB-контекстное меню (ParticipantContextMenu).
+ *  - В fullscreen — добавляются mini-slider громкости + mute (если есть screen-share
+ *    audio) и индикатор fps / bitrate. В fullscreen RMB-меню недоступно
+ *    привычным жестом, поэтому контролы перекатываются в overlay.
  */
 export function ScreenShareOverlay({
   participant,
@@ -45,6 +47,25 @@ export function ScreenShareOverlay({
     };
   }, [videoElement]);
   const isInPip = !!videoElement && document.pictureInPictureElement === videoElement;
+
+  // Тяжёлые контролы (слайдер громкости, mute, fps/Mbps) показываются
+  // ТОЛЬКО в fullscreen. В обычном тайле overlay имеет только PiP-кнопку —
+  // громкость в этом случае доступна через RMB-контекстное меню. Так
+  // тайл не загромождается, а в fullscreen демка остаётся control'абельной
+  // без выхода из режима просмотра.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    if (!videoElement) return;
+    const update = () => {
+      const fsEl = document.fullscreenElement;
+      setIsFullscreen(!!fsEl && fsEl.contains(videoElement));
+    };
+    update();
+    document.addEventListener('fullscreenchange', update);
+    return () => {
+      document.removeEventListener('fullscreenchange', update);
+    };
+  }, [videoElement]);
 
   const togglePip = async () => {
     if (!videoElement) return;
@@ -105,7 +126,7 @@ export function ScreenShareOverlay({
         onClick={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
       >
-        {hasScreenShareAudio && (
+        {isFullscreen && hasScreenShareAudio && (
           <>
             <button
               type="button"
@@ -141,7 +162,7 @@ export function ScreenShareOverlay({
         >
           <PictureInPicture2 size={14} />
         </button>
-        {stats && (
+        {isFullscreen && stats && (
           <span className="min-w-[6.5rem] font-mono text-[10px] tabular-nums text-fg-subtle">
             {stats.fps} fps · {stats.bitrateMbps} Mbps
           </span>
