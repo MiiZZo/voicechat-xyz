@@ -12,10 +12,13 @@ import { useStore } from '../state/store.js';
 
 type Props = {
   participantName: string;
+  /** Показывать ли блок громкости/mute для screen-share audio.
+   *  true — у этого участника есть publication Track.Source.ScreenShareAudio. */
+  hasScreenShareAudio: boolean;
   children: React.ReactNode;
 };
 
-export function ParticipantContextMenu({ participantName, children }: Props) {
+export function ParticipantContextMenu({ participantName, hasScreenShareAudio, children }: Props) {
   const { prefs, setPrefs } = useStore();
 
   if (!prefs) return <>{children}</>;
