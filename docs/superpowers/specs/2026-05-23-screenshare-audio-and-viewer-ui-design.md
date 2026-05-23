@@ -23,7 +23,7 @@
 | Pop-out демки | Через нативный Picture-in-Picture (`video.requestPictureInPicture()`) — поддерживается WebView2 и Chromium, никаких новых Tauri-окон |
 | Бейдж "это демка" | Маленький значок `🖥` рядом с именем в bottom-left pill |
 | FPS/битрейт зрителя | Опрос `RTCRtpReceiver.getStats()` раз в 1 сек, показ `48 fps · 6.2 Mbps` в углу панели контролов |
-| Electron-клиент | На него правки не распространяются: его `startShare()` не публикует `ScreenShareAudio`, поэтому новый код просто не активируется (там этой публикации нет в комнате). Тайл, если шарит Tauri-юзер, у Electron-зрителя также не должен получать звук — это допустимая регрессия для будущей итерации. |
+| Electron-клиент | Отправка: его `startShare()` не публикует `ScreenShareAudio` (это отдельная задача). Приём: рендерер шарится между Electron и Tauri, поэтому новый WebAudio-граф для `ScreenShareAudio` будет работать **в обоих клиентах при приёме** — если шарит Tauri-юзер с галочкой системного звука, и Electron-зритель, и Tauri-зритель услышат демку. Регрессии нет. |
 
 ## 3. Архитектура изменений
 
@@ -55,7 +55,7 @@ ScreenShareOverlay.tsx       — overlay с слайдером громкост�
 useReceiverStats.ts          — хук для опроса getStats(), переиспользуемый
 ```
 
-`ScreenShareOverlay` рендерится внутри `ParticipantTile` условно: `{remoteScreenShareAudioOrVideo && <ScreenShareOverlay ... />}`. Получает `participant`, `videoElement` (для PiP), `participantKey`, `prefs` через пропсы. Не имеет своего state — всё либо в prefs (volume/mute), либо в локальном hook.
+`ScreenShareOverlay` рендерится внутри `ParticipantTile` условно: **только когда `videoSource === Track.Source.ScreenShare`** (т.е. этот тайл — большой тайл шарера, не обычная камера). Получает `participant`, `videoElement` (для PiP), `participantKey`, `hasScreenShareAudio` через пропсы. Не имеет своего state — всё либо в prefs (volume/mute), либо в локальном hook (статистика, PiP-статус).
 
 WebAudio-граф для `ScreenShareAudio` живёт в **самом ParticipantTile**, не в overlay — потому что граф нельзя пересоздавать при unmount overlay'я (например когда курсор уходит). Overlay только читает текущее значение из prefs и пишет через `setPrefs`; применение к GainNode делает основной useEffect в ParticipantTile.
 
@@ -75,7 +75,7 @@ export type Prefs = {
 };
 ```
 
-Дефолт в `apps/client/src/main/prefs.ts` — два пустых объекта `{}`. Миграция не нужна — `electron-store` отдаст `undefined` для старых юзеров, в коде везде `prefs.participantScreenShareVolumes[name] ?? 1` и `prefs.participantScreenShareMuted[name] ?? false`.
+Дефолт в `apps/client/src/main/prefs.ts` — два пустых объекта `{}`. Миграция отдельно не требуется: существующая логика в `prefs.ts` спредит дефолты поверх сохранённых значений (`{ ...defaults, ...stored }`), поэтому новые поля у старых юзеров автоматически заполнятся пустыми объектами. В рендерере всё равно держим guards (`prefs.participantScreenShareVolumes[name] ?? 1`, `prefs.participantScreenShareMuted[name] ?? false`) на случай rename/удаления участника.
 
 ### 4.2. Новый useEffect в `ParticipantTile.tsx`
 
@@ -105,7 +105,11 @@ useEffect(() => {
   el.muted = true;
   el.volume = 0;
 
-  // ... (создаём AudioContext, GainNode, source, fallback на element — копия логики строк 115-188 микрофонного useEffect, с screen* ref'ами)
+  // ... далее симметрично существующему микрофонному useEffect-у:
+  //   создаём AudioContext (lazy), GainNode, MediaStreamAudioSourceNode из
+  //   track.mediaStreamTrack, ctx.resume(), setSinkId на ctx или fallback на el.
+  //   Логика на одну треть короче — нет per-track-id rebuild-сложностей,
+  //   но конструктивно повторяет mic path.
 }, [p, screenAudioTrackSid, screenAudioMuted, screenAudioTrackReady, prefs?.audioOutputDeviceId]);
 ```
 
@@ -118,7 +122,9 @@ useEffect(() => {
   const el = screenAudioRef.current;
   const vol = prefs?.participantScreenShareVolumes[participantKey] ?? 1;
   const muted = prefs?.participantScreenShareMuted[participantKey] ?? false;
-  // ... применяем gain.gain.setTargetAtTime либо el.volume — копия логики строк 211-237
+  // ... применяем gain.gain.setTargetAtTime(target, ctx.currentTime, 0.01)
+  //     либо fallback el.volume = Math.min(1, vol) / el.muted = muted —
+  //     симметрично существующему mic gain useEffect-у.
 }, [p, prefs?.participantScreenShareVolumes, prefs?.participantScreenShareMuted, screenAudioGraphTick]);
 ```
 
@@ -132,10 +138,20 @@ useEffect(() => {
 
 ### 4.3. Изменения в `ParticipantContextMenu.tsx`
 
-Добавляется второй блок с слайдером — копия существующего, но для screen-share:
+Расширяем сигнатуру компонента:
+
+```ts
+type Props = {
+  participantName: string;
+  hasScreenShareAudio: boolean;  // ← новый проп
+  children: React.ReactNode;
+};
+```
+
+Внутри читаем/пишем `prefs.participantScreenShareVolumes[participantName]` и `prefs.participantScreenShareMuted[participantName]` через те же `useStore()` + `window.api.setPrefs` (параллельно существующему `volume`/`muted` для микрофона). Добавляем второй блок в меню, видимый только когда у участника есть publication `ScreenShareAudio`:
 
 ```tsx
-{p.hasScreenShareAudio && (
+{hasScreenShareAudio && (
   <>
     <ContextMenuSeparator />
     <ContextMenuItem onSelect={(e) => { e.preventDefault(); toggleScreenMute(); }}>
@@ -154,7 +170,7 @@ useEffect(() => {
 )}
 ```
 
-`hasScreenShareAudio` приходит пропсом — родительский `ParticipantTile` уже знает про публикацию.
+Родительский `ParticipantTile` уже резолвит `Track.Source.ScreenShareAudio` publication для своих effect-ов — там же вычисляет boolean и передаёт в меню.
 
 ## 5. Часть 2: Overlay-контролы зрителя
 
@@ -187,7 +203,7 @@ export function ScreenShareOverlay({ participant, participantKey, videoElement, 
 Поведение:
 - **Volume mini** — компактный 60-пиксельный слайдер прямо в overlay. Тот же `prefs.participantScreenShareVolumes[participantKey]`.
 - **Mute** — кнопка-иконка, переключает `prefs.participantScreenShareMuted[participantKey]`.
-- **PiP** — вызывает `videoElement.requestPictureInPicture()`. Если уже в PiP — `document.exitPictureInPicture()`. Состояние "сейчас в PiP" локальное через `useState` + слушатель события `enterpictureinpicture`/`leavepictureinpicture` на video-элементе.
+- **PiP** — вызывает `videoElement.requestPictureInPicture()`. Если уже в PiP (`document.pictureInPictureElement === videoElement`) — `document.exitPictureInPicture()`. Источник истины — `document.pictureInPictureElement`; локального state не держим, а для триггера ре-рендера подписываемся на `enterpictureinpicture`/`leavepictureinpicture` и форсим re-render через `useState(0)` tick.
 - **FPS · Mbps** — из `useReceiverStats`, обновляется раз в 1 сек.
 
 Overlay скрыт по умолчанию (`opacity-0`), показывается при `group-hover` родителя (родитель — сам тайл с классом `group`, который уже есть) либо при focus-within (для клавиатурной навигации).
@@ -199,9 +215,22 @@ type ReceiverStats = { fps: number; bitrateMbps: number };
 
 export function useReceiverStats(p: Participant, source: Track.Source): ReceiverStats | null {
   const [stats, setStats] = useState<ReceiverStats | null>(null);
+  const [tick, setTick] = useState(0);  // принудительный ре-вход useEffect когда publication появится позже
+  useEffect(() => {
+    const bump = () => setTick((t) => t + 1);
+    p.on(ParticipantEvent.TrackSubscribed, bump);
+    p.on(ParticipantEvent.TrackUnsubscribed, bump);
+    return () => {
+      p.off(ParticipantEvent.TrackSubscribed, bump);
+      p.off(ParticipantEvent.TrackUnsubscribed, bump);
+    };
+  }, [p]);
   useEffect(() => {
     const pub = p.getTrackPublication(source);
-    const receiver = pub?.track?.receiver;
+    const track = pub?.track;
+    // RemoteVideoTrack / RemoteAudioTrack — у них есть .receiver. Базовый Track
+    // тип его не экспозит, поэтому нужен narrow.
+    const receiver = (track && 'receiver' in track) ? (track as RemoteVideoTrack | RemoteAudioTrack).receiver : null;
     if (!receiver) { setStats(null); return; }
     let prevBytes = 0;
     let prevTs = 0;
@@ -224,12 +253,12 @@ export function useReceiverStats(p: Participant, source: Track.Source): Receiver
       prevBytes = bytes; prevTs = ts;
     }, 1000);
     return () => clearInterval(id);
-  }, [p, source]);
+  }, [p, source, tick]);
   return stats;
 }
 ```
 
-Поллинг внутри hook'а нужен потому, что `getStats()` асинхронен и WebRTC не даёт push-уведомлений. 1 сек — достаточно частый интервал для UI без перегрева.
+Поллинг внутри hook'а нужен потому, что `getStats()` асинхронен и WebRTC не даёт push-уведомлений. 1 сек — достаточно частый интервал для UI без перегрева. Отдельный `tick`-effect перезапускает основной effect при появлении/исчезновении подписки на трек (publication может существовать до того, как track реально подписан — без `tick` мы один раз получили `null` и больше не пробовали бы).
 
 ### 5.3. Picture-in-Picture
 
@@ -297,11 +326,13 @@ PiP-окно даёт нативные системные контролы (play
    - Overlay исчезает у зрителей. WebAudio-граф screen-share очищается. Никаких "висящих" `<audio>`-элементов.
 5. **Sharer запускает шеру повторно после Stop**:
    - Громкость демки восстанавливается из prefs (persisted).
-6. **Sharer на Electron**, зритель на Tauri:
-   - Звука нет (ожидаемо, Electron не публикует ScreenShareAudio). Overlay показывает PiP/FPS, но не volume/mute. Не падает.
-7. **Bad network / packet loss** на принимающей стороне:
+6. **Sharer на Electron**, зритель на Tauri (или наоборот):
+   - Звука нет — Electron не публикует `ScreenShareAudio` (это отдельная задача). Overlay показывает PiP/FPS, но не volume/mute. Не падает. Если overlay временно показывает пустую полупрозрачную плашку только с PiP-кнопкой пока `getStats` не вернул данные — это допустимо.
+7. **Sharer на Tauri, зритель на Electron**:
+   - Звук **есть**. Тот же React-рендерер, тот же WebAudio-граф работает в Electron-окне.
+8. **Bad network / packet loss** на принимающей стороне:
    - FPS-индикатор показывает деградацию. Звук может рваться — это нормально, UI это отражает.
-8. **Sharer mute/unmute системного звука посреди шеры** (через ОС-микшер) — не наш случай; звук на стороне источника просто становится тишиной, никаких ошибок.
+9. **Sharer mute/unmute системного звука посреди шеры** (через ОС-микшер) — не наш случай; звук на стороне источника просто становится тишиной, никаких ошибок.
 
 ## 8. Что НЕ входит в эту итерацию
 
