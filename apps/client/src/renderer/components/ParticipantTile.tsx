@@ -43,7 +43,6 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const screenSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const screenSourceStreamIdRef = useRef<string | null>(null);
   const screenAudioRef = useRef<HTMLAudioElement | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [screenAudioGraphTick, setScreenAudioGraphTick] = useState(0);
   const { prefs } = useStore();
   const [, force] = useState(0);
@@ -64,9 +63,7 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const participantKey = p.name ?? p.identity;
   const muted = !p.isLocal && !!prefs?.participantMuted[participantKey];
   const persistedVolume = prefs?.participantVolumes[participantKey];
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const screenMuted = !p.isLocal && !!prefs?.participantScreenShareMuted[participantKey];
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const persistedScreenVolume = prefs?.participantScreenShareVolumes[participantKey];
 
   useEffect(() => {
@@ -362,6 +359,33 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       el.volume = Math.min(1, vol);
     }
   }, [p, muted, persistedVolume, audioGraphTick]);
+
+  // Применяет screen-share громкость/mute к GainNode. Запускается на каждое
+  // изменение prefs.participantScreenShareVolumes/Muted и при пересборке графа.
+  useEffect(() => {
+    if (p.isLocal) return;
+    const gain = screenGainNodeRef.current;
+    const ctx = screenAudioCtxRef.current;
+    const el = screenAudioRef.current;
+    const vol = typeof persistedScreenVolume === 'number' ? persistedScreenVolume : 1;
+    if (gain && ctx) {
+      const target = screenMuted ? 0 : vol;
+      try {
+        gain.gain.setTargetAtTime(target, ctx.currentTime, 0.01);
+      } catch {
+        gain.gain.value = target;
+      }
+      if (el) {
+        el.muted = true;
+        el.volume = 0;
+      }
+      if (ctx.state === 'suspended') ctx.resume().catch(() => undefined);
+    } else if (el) {
+      // Web Audio недоступен — нативные controls с потолком 100%.
+      el.muted = screenMuted;
+      el.volume = Math.min(1, vol);
+    }
+  }, [p, screenMuted, persistedScreenVolume, screenAudioGraphTick]);
 
   // AudioContext may start suspended in Electron until first user gesture.
   // Resume on the next pointer/key event.
