@@ -21,6 +21,8 @@ const defaults: Prefs = {
   },
   participantVolumes: {},
   participantMuted: {},
+  participantScreenShareVolumes: {},
+  participantScreenShareMuted: {},
   initialDeviceState: { mic: true, camera: false },
   closeToTray: true,
   screenSharePreset: 'smooth',

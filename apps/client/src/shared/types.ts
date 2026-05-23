@@ -53,6 +53,11 @@ export type Prefs = {
   };
   participantVolumes: Record<string, number>;
   participantMuted: Record<string, boolean>;
+  /** Per-participant gain for screen-share audio. Independent of participantVolumes.
+   *  Key = participant.name ?? identity. Range 0..2 (matches voice). Missing key = 1. */
+  participantScreenShareVolumes: Record<string, number>;
+  /** Per-participant mute for screen-share audio. Independent of participantMuted. */
+  participantScreenShareMuted: Record<string, boolean>;
   initialDeviceState: { mic: boolean; camera: boolean };
   closeToTray: boolean;
   screenSharePreset: ScreenSharePreset;

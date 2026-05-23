@@ -6,11 +6,12 @@ import {
   type Participant,
   type TrackPublication,
 } from 'livekit-client';
-import { Mic, MicOff, VideoOff, VolumeX, Maximize2 } from 'lucide-react';
+import { Mic, MicOff, VideoOff, VolumeX, Maximize2, Monitor } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { useStore } from '../state/store.js';
 import { Avatar, AvatarFallback, AvatarImage, avatarColor, customAvatar } from './ui/avatar.js';
 import { ParticipantContextMenu } from './ParticipantContextMenu.js';
+import { ScreenShareOverlay } from './ScreenShareOverlay.js';
 import { QualityIndicator } from './QualityIndicator.js';
 
 type Props = {
@@ -34,6 +35,16 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const sourceStreamIdRef = useRef<string | null>(null);
   const [audioGraphTick, setAudioGraphTick] = useState(0);
+  // Параллельный WebAudio-граф для Track.Source.ScreenShareAudio.
+  // Полностью независим от микрофонного: свой AudioContext, GainNode, source.
+  // Зачем отдельный AudioContext: ставить sinkId на ctx можно один раз, и
+  // переключение output device не должно дёргать гейн микрофонного графа.
+  const screenAudioCtxRef = useRef<AudioContext | null>(null);
+  const screenGainNodeRef = useRef<GainNode | null>(null);
+  const screenSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const screenSourceStreamIdRef = useRef<string | null>(null);
+  const screenAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [screenAudioGraphTick, setScreenAudioGraphTick] = useState(0);
   const { prefs } = useStore();
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
@@ -53,6 +64,8 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const participantKey = p.name ?? p.identity;
   const muted = !p.isLocal && !!prefs?.participantMuted[participantKey];
   const persistedVolume = prefs?.participantVolumes[participantKey];
+  const screenMuted = !p.isLocal && !!prefs?.participantScreenShareMuted[participantKey];
+  const persistedScreenVolume = prefs?.participantScreenShareVolumes[participantKey];
 
   useEffect(() => {
     const events = [
@@ -79,6 +92,11 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const audioTrackSid = audioPub?.trackSid;
   const audioMuted = audioPub?.isMuted;
   const audioTrackReady = !!audioPub?.track;
+  const screenAudioPub = p.getTrackPublication(Track.Source.ScreenShareAudio);
+  const screenAudioTrackSid = screenAudioPub?.trackSid;
+  const screenAudioMuted = screenAudioPub?.isMuted;
+  const screenAudioTrackReady = !!screenAudioPub?.track;
+  const hasScreenShareAudio = !!screenAudioPub;
 
   useEffect(() => {
     const pub: TrackPublication | undefined = p.getTrackPublication(videoSource);
@@ -187,6 +205,91 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     };
   }, [p, audioTrackSid, audioMuted, audioTrackReady, prefs?.audioOutputDeviceId]);
 
+  // Параллельный к микрофонному пути attach-эффект для ScreenShareAudio.
+  // Структурно делает то же самое: attach к скрытому <audio> чтобы LiveKit
+  // прокачал поток, force-mute элемента, реальный звук через WebAudio с
+  // независимым GainNode (для громкости 0..200% и индивидуального mute).
+  useEffect(() => {
+    if (p.isLocal) return;
+    const pub = p.getTrackPublication(Track.Source.ScreenShareAudio);
+    const track = pub?.track;
+    const el = screenAudioRef.current;
+    if (!track || !el) return;
+
+    track.attach(el);
+    el.muted = true;
+    el.volume = 0;
+
+    let ctx = screenAudioCtxRef.current;
+    if (!ctx) {
+      try {
+        ctx = new AudioContext();
+        screenAudioCtxRef.current = ctx;
+      } catch {
+        // Web Audio недоступен — fallback на нативный <audio>.
+        el.muted = false;
+        el.volume = 1;
+        return () => {
+          track.detach(el);
+        };
+      }
+    }
+
+    let gain = screenGainNodeRef.current;
+    if (!gain) {
+      gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      screenGainNodeRef.current = gain;
+    }
+
+    // Пересобираем MediaStreamAudioSourceNode при смене underlying MediaStreamTrack
+    // (resubscribe, republish и т.п. меняют идентичность track'а).
+    const mst = track.mediaStreamTrack;
+    if (mst) {
+      const streamId = mst.id;
+      if (screenSourceStreamIdRef.current !== streamId) {
+        try {
+          screenSourceNodeRef.current?.disconnect();
+        } catch {
+          // already disconnected
+        }
+        try {
+          const stream = new MediaStream([mst]);
+          const source = ctx.createMediaStreamSource(stream);
+          source.connect(gain);
+          screenSourceNodeRef.current = source;
+          screenSourceStreamIdRef.current = streamId;
+          // Bump tick — заставляет gain-effect перенакатить громкость.
+          setScreenAudioGraphTick((n) => n + 1);
+        } catch {
+          // Если не получилось — fallback на нативное воспроизведение.
+          el.muted = false;
+          el.volume = 1;
+        }
+      }
+    }
+
+    ctx.resume().catch(() => undefined);
+
+    const deviceId = prefs?.audioOutputDeviceId;
+    if (deviceId) {
+      const ctxWithSink = ctx as AudioContext & {
+        setSinkId?: (id: string) => Promise<void>;
+      };
+      if (typeof ctxWithSink.setSinkId === 'function') {
+        ctxWithSink.setSinkId(deviceId).catch(() => undefined);
+      } else if ('setSinkId' in HTMLMediaElement.prototype) {
+        (el as HTMLAudioElement & { setSinkId: (id: string) => Promise<void> })
+          .setSinkId(deviceId)
+          .catch(() => undefined);
+      }
+    }
+
+    return () => {
+      track.detach(el);
+    };
+  }, [p, screenAudioTrackSid, screenAudioMuted, screenAudioTrackReady, prefs?.audioOutputDeviceId]);
+
   // Tear down Web Audio graph on unmount.
   useEffect(() => {
     return () => {
@@ -205,6 +308,27 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       sourceStreamIdRef.current = null;
       gainNodeRef.current = null;
       audioCtxRef.current = null;
+    };
+  }, []);
+
+  // Teardown для screen-share WebAudio графа при размонтировании тайла.
+  useEffect(() => {
+    return () => {
+      try {
+        screenSourceNodeRef.current?.disconnect();
+      } catch {
+        // ignore
+      }
+      try {
+        screenGainNodeRef.current?.disconnect();
+      } catch {
+        // ignore
+      }
+      screenAudioCtxRef.current?.close().catch(() => undefined);
+      screenSourceNodeRef.current = null;
+      screenSourceStreamIdRef.current = null;
+      screenGainNodeRef.current = null;
+      screenAudioCtxRef.current = null;
     };
   }, []);
 
@@ -236,19 +360,52 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     }
   }, [p, muted, persistedVolume, audioGraphTick]);
 
-  // AudioContext may start suspended in Electron until first user gesture.
-  // Resume on the next pointer/key event.
+  // Применяет screen-share громкость/mute к GainNode. Запускается на каждое
+  // изменение prefs.participantScreenShareVolumes/Muted и при пересборке графа.
   useEffect(() => {
-    const ctx = audioCtxRef.current;
-    if (!ctx || ctx.state !== 'suspended') return;
-    const resume = () => ctx.resume().catch(() => undefined);
+    if (p.isLocal) return;
+    const gain = screenGainNodeRef.current;
+    const ctx = screenAudioCtxRef.current;
+    const el = screenAudioRef.current;
+    const vol = typeof persistedScreenVolume === 'number' ? persistedScreenVolume : 1;
+    if (gain && ctx) {
+      const target = screenMuted ? 0 : vol;
+      try {
+        gain.gain.setTargetAtTime(target, ctx.currentTime, 0.01);
+      } catch {
+        gain.gain.value = target;
+      }
+      if (el) {
+        el.muted = true;
+        el.volume = 0;
+      }
+      if (ctx.state === 'suspended') ctx.resume().catch(() => undefined);
+    } else if (el) {
+      // Web Audio недоступен — нативные controls с потолком 100%.
+      el.muted = screenMuted;
+      el.volume = Math.min(1, vol);
+    }
+  }, [p, screenMuted, persistedScreenVolume, screenAudioGraphTick]);
+
+  // AudioContexts may start suspended in Electron until first user gesture.
+  // Resume both mic and screen-share contexts on the next pointer/key event.
+  useEffect(() => {
+    const micCtx = audioCtxRef.current;
+    const screenCtx = screenAudioCtxRef.current;
+    const needsMic = micCtx && micCtx.state === 'suspended';
+    const needsScreen = screenCtx && screenCtx.state === 'suspended';
+    if (!needsMic && !needsScreen) return;
+    const resume = () => {
+      if (needsMic) micCtx.resume().catch(() => undefined);
+      if (needsScreen) screenCtx.resume().catch(() => undefined);
+    };
     window.addEventListener('pointerdown', resume, { once: true });
     window.addEventListener('keydown', resume, { once: true });
     return () => {
       window.removeEventListener('pointerdown', resume);
       window.removeEventListener('keydown', resume);
     };
-  }, [audioGraphTick]);
+  }, [audioGraphTick, screenAudioGraphTick]);
 
   const micPub = p.getTrackPublication(Track.Source.Microphone);
   const camPub = p.getTrackPublication(videoSource);
@@ -291,6 +448,7 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       )}
 
       {!p.isLocal && <audio ref={audioRef} autoPlay />}
+      {!p.isLocal && <audio ref={screenAudioRef} autoPlay />}
 
       {showVideo && (
         <button
@@ -302,6 +460,15 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         >
           <Maximize2 className="h-3.5 w-3.5" />
         </button>
+      )}
+
+      {!p.isLocal && videoSource === Track.Source.ScreenShare && (
+        <ScreenShareOverlay
+          participant={p}
+          participantKey={participantKey}
+          videoElement={videoRef.current}
+          hasScreenShareAudio={hasScreenShareAudio}
+        />
       )}
 
       {/* Status chips — top right */}
@@ -330,6 +497,9 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
 
       {/* Name pill — bottom left */}
       <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs backdrop-blur">
+        {videoSource === Track.Source.ScreenShare && (
+          <Monitor size={11} className="text-fg-subtle" aria-label="Демонстрация экрана" />
+        )}
         {!micOff && (
           <Mic size={11} className={cn(speaking ? 'text-fg' : 'text-fg-subtle')} />
         )}
@@ -340,5 +510,9 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   );
 
   if (p.isLocal) return tile;
-  return <ParticipantContextMenu participantName={participantKey}>{tile}</ParticipantContextMenu>;
+  return (
+    <ParticipantContextMenu participantName={participantKey} hasScreenShareAudio={hasScreenShareAudio}>
+      {tile}
+    </ParticipantContextMenu>
+  );
 }
