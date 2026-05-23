@@ -64,6 +64,12 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
           {participantName}
         </ContextMenuLabel>
         <ContextMenuSeparator />
+
+        {/* SubLabel-style категория (text-xs font-medium text-fg-muted) — тот
+            же паттерн mini-header'а, что и Group title в SettingsModal. */}
+        <ContextMenuLabel className="px-2 pt-1 pb-0 text-xs font-medium text-fg-muted">
+          Голос
+        </ContextMenuLabel>
         <ContextMenuItem
           onSelect={(e) => {
             e.preventDefault();
@@ -74,7 +80,6 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
           {muted ? <Volume2 /> : <VolumeX />}
           <span>{muted ? 'Включить звук' : 'Отключить звук'}</span>
         </ContextMenuItem>
-        <ContextMenuSeparator />
         <div className="flex items-center gap-3 px-2 py-2">
           <span className="text-xs text-fg-muted">Громкость</span>
           <Slider
@@ -90,9 +95,13 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
             {Math.round(volume * 100)}%
           </span>
         </div>
+
         {hasScreenShareAudio && (
           <>
             <ContextMenuSeparator />
+            <ContextMenuLabel className="px-2 pt-1 pb-0 text-xs font-medium text-fg-muted">
+              Экран
+            </ContextMenuLabel>
             <ContextMenuItem
               onSelect={(e) => {
                 e.preventDefault();
@@ -101,11 +110,10 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
               className="[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0"
             >
               {screenMuted ? <Volume2 /> : <VolumeX />}
-              <span>{screenMuted ? 'Включить звук демки' : 'Отключить звук демки'}</span>
+              <span>{screenMuted ? 'Включить звук' : 'Отключить звук'}</span>
             </ContextMenuItem>
-            <ContextMenuSeparator />
             <div className="flex items-center gap-3 px-2 py-2">
-              <span className="text-xs text-fg-muted">Громкость демки</span>
+              <span className="text-xs text-fg-muted">Громкость</span>
               <Slider
                 className="flex-1"
                 value={[screenVolume]}
