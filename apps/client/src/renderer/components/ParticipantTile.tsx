@@ -34,6 +34,18 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const sourceStreamIdRef = useRef<string | null>(null);
   const [audioGraphTick, setAudioGraphTick] = useState(0);
+  // Параллельный WebAudio-граф для Track.Source.ScreenShareAudio.
+  // Полностью независим от микрофонного: свой AudioContext, GainNode, source.
+  // Зачем отдельный AudioContext: ставить sinkId на ctx можно один раз, и
+  // переключение output device не должно дёргать гейн микрофонного графа.
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  const screenAudioCtxRef = useRef<AudioContext | null>(null);
+  const screenGainNodeRef = useRef<GainNode | null>(null);
+  const screenSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const screenSourceStreamIdRef = useRef<string | null>(null);
+  const screenAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [screenAudioGraphTick, setScreenAudioGraphTick] = useState(0);
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   const { prefs } = useStore();
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
@@ -53,6 +65,10 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const participantKey = p.name ?? p.identity;
   const muted = !p.isLocal && !!prefs?.participantMuted[participantKey];
   const persistedVolume = prefs?.participantVolumes[participantKey];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const screenMuted = !p.isLocal && !!prefs?.participantScreenShareMuted[participantKey];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const persistedScreenVolume = prefs?.participantScreenShareVolumes[participantKey];
 
   useEffect(() => {
     const events = [
@@ -79,6 +95,13 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const audioTrackSid = audioPub?.trackSid;
   const audioMuted = audioPub?.isMuted;
   const audioTrackReady = !!audioPub?.track;
+  const screenAudioPub = p.getTrackPublication(Track.Source.ScreenShareAudio);
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  const screenAudioTrackSid = screenAudioPub?.trackSid;
+  const screenAudioMuted = screenAudioPub?.isMuted;
+  const screenAudioTrackReady = !!screenAudioPub?.track;
+  const hasScreenShareAudio = !!screenAudioPub;
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   useEffect(() => {
     const pub: TrackPublication | undefined = p.getTrackPublication(videoSource);
@@ -291,6 +314,7 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       )}
 
       {!p.isLocal && <audio ref={audioRef} autoPlay />}
+      {!p.isLocal && <audio ref={screenAudioRef} autoPlay />}
 
       {showVideo && (
         <button
