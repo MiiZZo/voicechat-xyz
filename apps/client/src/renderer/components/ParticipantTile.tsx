@@ -95,7 +95,6 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   const screenAudioTrackSid = screenAudioPub?.trackSid;
   const screenAudioMuted = screenAudioPub?.isMuted;
   const screenAudioTrackReady = !!screenAudioPub?.track;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const hasScreenShareAudio = !!screenAudioPub;
 
   useEffect(() => {
@@ -498,5 +497,9 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
   );
 
   if (p.isLocal) return tile;
-  return <ParticipantContextMenu participantName={participantKey}>{tile}</ParticipantContextMenu>;
+  return (
+    <ParticipantContextMenu participantName={participantKey} hasScreenShareAudio={hasScreenShareAudio}>
+      {tile}
+    </ParticipantContextMenu>
+  );
 }
