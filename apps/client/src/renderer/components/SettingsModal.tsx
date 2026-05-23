@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   AudioWaveform,
   HelpCircle,
@@ -119,10 +119,18 @@ export function SettingsModal({ open, onOpenChange }: Props) {
           в проекте без twMerge, утилитарные классы могут не перебить
           дефолты Dialog (p-6, max-w-md, gap-5). */}
       <DialogContent
-        className="overflow-hidden"
+        // flex-col (overrides Dialog's default `grid`) — so body's flex-1 actually
+        // stretches to fill the modal height. With grid + auto rows the body would
+        // size to content and the header would float in the remaining gap.
+        // Sliding-in-from-bottom matches mockup .modal-card entrance animation.
+        className={cn(
+          // Override Dialog's default grid → flex-col so body's flex-1 fills.
+          // Animation comes from the parent DialogContent's vo-modal-anim class.
+          'flex flex-col overflow-hidden',
+        )}
         style={{
-          width: 820,
-          height: 560,
+          width: 880,
+          height: 640,
           maxWidth: 'calc(100vw - 2rem)',
           maxHeight: 'calc(100vh - 2rem)',
           padding: 0,
@@ -134,16 +142,18 @@ export function SettingsModal({ open, onOpenChange }: Props) {
           Устройства, обработка звука, поведение приложения
         </DialogDescription>
 
-        <div className="flex h-full">
-          {/* Sidebar — список секций. Тон чуть темнее content'а, чтобы
-              создать визуальную глубину без отдельного border'а. */}
-          <aside className="flex w-[244px] shrink-0 flex-col border-r border-border bg-bg/40">
-            <div className="px-5 pb-5 pt-7">
-              <div className="text-xl font-semibold leading-none tracking-tight text-fg">
-                Настройки
-              </div>
-            </div>
-            <nav className="flex flex-1 flex-col gap-1 px-3 pb-4">
+        {/* Velvet Onyx modal header — title + version subtitle, mirrors mockup .modal-header */}
+        <header className="flex shrink-0 items-center gap-3 border-b border-white/[0.05] px-[22px] py-[18px]">
+          <h2 className="text-[17px] font-semibold leading-none tracking-[-0.005em] text-fg">
+            Настройки
+          </h2>
+          <HeaderVersionBadge />
+        </header>
+
+        <div className="flex h-full min-h-0 flex-1">
+          {/* Sidebar — section nav only (title moved to modal header above). */}
+          <aside className="flex w-[200px] shrink-0 flex-col border-r border-white/[0.05] bg-black/20 pt-3.5">
+            <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 pb-3">
               {TABS.map((tab) => (
                 <TabButton
                   key={tab.id}
@@ -159,9 +169,12 @@ export function SettingsModal({ open, onOpenChange }: Props) {
           {/* Content — скроллится внутри. key даёт лёгкую fade-in анимацию
               при переключении табов. */}
           <main className="flex-1 overflow-y-auto">
-            <div key={activeTab} className="animate-in fade-in-0 duration-150 px-8 pb-8 pt-7">
+            <div
+              key={activeTab}
+              className="animate-in fade-in-0 slide-in-from-bottom-1.5 duration-[250ms] px-8 pb-8 pt-7"
+            >
               <ContentHeader tab={current} />
-              <div className="mt-5 flex flex-col gap-5">
+              <div className="mt-2 flex flex-col">
                 {activeTab === 'devices' && (
                   <>
                     <DeviceField
@@ -188,10 +201,15 @@ export function SettingsModal({ open, onOpenChange }: Props) {
 
                 {activeTab === 'mic' && (
                   <>
-                    <ModePicker mode={prefs.micActivationMode} onChange={setMode} />
+                    <Block
+                      title="Когда передавать голос"
+                      desc="Выбери, что должно открывать твой микрофон в эфир."
+                    >
+                      <ModePicker mode={prefs.micActivationMode} onChange={setMode} />
+                    </Block>
                     {prefs.micActivationMode === 'ptt' && (
-                      <div className="flex items-center justify-between gap-4 pl-1 pt-1">
-                        <span className="text-xs text-fg-muted">Клавиша</span>
+                      <div className="flex items-center justify-between gap-6 border-b border-white/[0.05] py-4 last:border-b-0">
+                        <span className="text-[13px] font-medium text-fg">Клавиша push-to-talk</span>
                         <Button
                           variant="outline"
                           size="sm"
@@ -233,6 +251,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                   <>
                     <Toggle
                       label="Эхоподавление"
+                      desc="Убирает эхо, когда звук идёт через колонки."
                       checked={prefs.audioConstraints.echoCancellation}
                       onChange={(v) =>
                         update({
@@ -242,6 +261,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                     />
                     <Toggle
                       label="Шумоподавление"
+                      desc="Гасит фоновые шумы: клавиатуру, кулеры, эхо комнаты."
                       checked={prefs.audioConstraints.noiseSuppression}
                       onChange={(v) =>
                         update({
@@ -251,6 +271,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                     />
                     <Toggle
                       label="Авто-громкость"
+                      desc="Подстраивает уровень микрофона автоматически."
                       checked={prefs.audioConstraints.autoGainControl}
                       onChange={(v) =>
                         update({
@@ -263,31 +284,30 @@ export function SettingsModal({ open, onOpenChange }: Props) {
 
                 {activeTab === 'system' && (
                   <>
-                    <Group title="Звуки">
-                      {/* Toggle + slider — одна логическая единица, поэтому
-                          вложены в общий контейнер с gap-2 (8px). Родительский
-                          Group gap-3 (12px) применяется только между этим
-                          блоком и SubLabel'ом сверху. Slider — sub-контрол
-                          к toggle: pl-3 для визуальной иерархии + opacity-40
-                          когда звуки выключены. */}
-                      <div className="flex flex-col gap-2">
-                        <Toggle
-                          label="Системные звуки"
+                    {/* Sounds toggle + volume sub-control share one row container —
+                        the volume slider is conceptually a sub-setting of the toggle,
+                        so no internal hairline separates them. */}
+                    <div className="border-b border-white/[0.05] py-4 last:border-b-0">
+                      <label className="flex cursor-pointer select-none items-center justify-between gap-6">
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className="text-[13px] font-medium text-fg">Системные звуки</span>
+                          <span className="text-[12px] leading-[1.5] text-fg-subtle">
+                            Подключение/отключение участников, входящие сообщения.
+                          </span>
+                        </div>
+                        <Switch
                           checked={prefs.soundsEnabled}
-                          onChange={(v) => update({ soundsEnabled: v })}
+                          onCheckedChange={(v) => update({ soundsEnabled: v })}
                         />
-                        <div
-                          className={cn(
-                            'flex flex-col gap-1.5 pl-3 transition-opacity',
-                            !prefs.soundsEnabled && 'opacity-40',
-                          )}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-fg-muted">Громкость</span>
-                            <span className="font-mono text-[10px] tabular-nums text-fg-subtle">
-                              {Math.round(prefs.soundsVolume * 100)}%
-                            </span>
-                          </div>
+                      </label>
+                      <div
+                        className={cn(
+                          'mt-3 flex items-center gap-4 pl-3 transition-opacity',
+                          !prefs.soundsEnabled && 'opacity-40',
+                        )}
+                      >
+                        <span className="shrink-0 text-[12px] text-fg-muted">Громкость</span>
+                        <div className="min-w-0 flex-1">
                           <Slider
                             min={0}
                             max={100}
@@ -299,50 +319,77 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                             disabled={!prefs.soundsEnabled}
                           />
                         </div>
+                        <span className="w-10 shrink-0 text-right font-mono text-[10px] tabular-nums text-fg-subtle">
+                          {Math.round(prefs.soundsVolume * 100)}%
+                        </span>
                       </div>
-                    </Group>
+                    </div>
 
-                    <Group title="Уведомления">
-                      <Toggle
-                        label="Уведомления о сообщениях в фоне"
-                        checked={prefs.notificationsEnabled}
-                        onChange={(v) => update({ notificationsEnabled: v })}
-                      />
+                    {/* Notifications toggle + position picker share one row container —
+                        picker is conceptually a sub-setting of the toggle. */}
+                    <div className="border-b border-white/[0.05] py-4 last:border-b-0">
+                      <label className="flex cursor-pointer select-none items-center justify-between gap-6">
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className="text-[13px] font-medium text-fg">
+                            Уведомления о сообщениях в фоне
+                          </span>
+                          <span className="text-[12px] leading-[1.5] text-fg-subtle">
+                            Показывать всплывающий тост, когда окно вне фокуса.
+                          </span>
+                        </div>
+                        <Switch
+                          checked={prefs.notificationsEnabled}
+                          onCheckedChange={(v) => update({ notificationsEnabled: v })}
+                        />
+                      </label>
                       <div
                         className={cn(
-                          'flex flex-col gap-1.5 pl-3 transition-opacity',
+                          'mt-3 flex flex-col gap-2 pl-3 transition-opacity',
                           !prefs.notificationsEnabled && 'opacity-40',
                         )}
                       >
-                        <span className="text-xs text-fg-muted">Позиция на экране</span>
+                        <span className="text-[12px] text-fg-muted">Позиция на экране</span>
                         <NotificationCornerPicker
                           value={prefs.notificationPosition}
                           onChange={(v) => update({ notificationPosition: v })}
                           disabled={!prefs.notificationsEnabled}
                         />
                       </div>
-                    </Group>
+                    </div>
 
-                    <Group title="Окно">
-                      <Toggle
-                        label="Сворачивать в трей при закрытии"
-                        checked={prefs.closeToTray}
-                        onChange={(v) => update({ closeToTray: v })}
-                      />
-                    </Group>
+                    <Toggle
+                      label="Сворачивать в трей при закрытии"
+                      desc="Кнопка закрытия не выключает приложение, а отправляет его в трей."
+                      checked={prefs.closeToTray}
+                      onChange={(v) => update({ closeToTray: v })}
+                    />
                   </>
                 )}
 
                 {activeTab === 'screen' && (
                   <>
-                    <ScreenSharePresetPicker
-                      value={prefs.screenSharePreset}
-                      onChange={(v) => update({ screenSharePreset: v })}
-                    />
-                    <ScreenShareCodecPicker
-                      value={prefs.screenShareCodec}
-                      onChange={(v) => update({ screenShareCodec: v })}
-                    />
+                    <Block
+                      title="Профиль качества"
+                      desc="Выбери баланс между плавностью и чёткостью."
+                    >
+                      <ScreenSharePresetPicker
+                        value={prefs.screenSharePreset}
+                        onChange={(v) => update({ screenSharePreset: v })}
+                      />
+                    </Block>
+                    {/* Codec — inline mset-row (label left, select right). */}
+                    <div className="flex items-center justify-between gap-6 border-b border-white/[0.05] py-4 last:border-b-0">
+                      <div className="flex min-w-0 flex-col gap-1">
+                        <span className="text-[13px] font-medium text-fg">Видеокодек</span>
+                        <span className="text-[12px] leading-[1.5] text-fg-subtle">
+                          VP8 быстрее на CPU, H264 даёт лучшее качество.
+                        </span>
+                      </div>
+                      <ScreenShareCodecPicker
+                        value={prefs.screenShareCodec}
+                        onChange={(v) => update({ screenShareCodec: v })}
+                      />
+                    </div>
                   </>
                 )}
               </div>
@@ -370,22 +417,16 @@ function TabButton({
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'relative flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors',
+        // Match mockup .nav-item — no left accent bar, just bg + border + inset
+        // highlight on active.
+        'flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-[13px] font-medium leading-none transition-all',
         active
-          ? 'bg-bg-muted/70 text-fg'
-          : 'text-fg-muted hover:bg-bg-muted/30 hover:text-fg',
+          ? 'border border-white/[0.08] bg-white/[0.06] text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_14px_-8px_rgba(0,0,0,0.4)]'
+          : 'border border-transparent text-fg-muted hover:bg-white/[0.04] hover:text-fg',
       )}
     >
-      {/* Аксент-планка слева — только в активном состоянии. */}
-      <span
-        aria-hidden
-        className={cn(
-          'absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-r-full bg-fg transition-opacity',
-          active ? 'opacity-100' : 'opacity-0',
-        )}
-      />
-      <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
-      <span className="truncate text-sm font-medium leading-none">{tab.label}</span>
+      <Icon className="h-[15px] w-[15px] shrink-0 opacity-85" strokeWidth={1.75} />
+      <span className="truncate">{tab.label}</span>
     </button>
   );
 }
@@ -460,15 +501,34 @@ function AppFooter() {
 }
 
 function ContentHeader({ tab }: { tab: TabDef }) {
+  // Velvet Onyx: pane-head pattern — title + caption above hairline separator
   return (
-    <div className="flex flex-col gap-1.5">
-      <h2 className="text-xl font-semibold leading-none tracking-tight text-fg">
+    <div className="mb-2 flex flex-col gap-1 border-b border-white/[0.05] pb-[18px]">
+      <h2 className="text-[20px] font-semibold leading-none tracking-[-0.01em] text-fg">
         {tab.label}
       </h2>
       {tab.caption && (
-        <p className="text-xs leading-none text-fg-subtle">{tab.caption}</p>
+        <p className="text-xs leading-none tracking-[0.02em] text-fg-subtle">
+          {tab.caption}
+        </p>
       )}
     </div>
+  );
+}
+
+/** Small mono badge for the modal header — fetches the running app version
+ *  on mount and renders it next to "Настройки". Mirrors mockup .modal-header .sub. */
+function HeaderVersionBadge() {
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    const api = window.api as { getAppVersion?: () => Promise<string> };
+    void api.getAppVersion?.().then(setVersion).catch(() => undefined);
+  }, []);
+  if (!version) return null;
+  return (
+    <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-fg-subtle">
+      Voicechat · v{version}
+    </span>
   );
 }
 
@@ -479,42 +539,28 @@ function ScreenShareCodecPicker({
   value: ScreenShareCodec;
   onChange: (v: ScreenShareCodec) => void;
 }) {
+  // Mockup renders the codec as a regular dropdown — radio-button-group was a
+  // stylistic experiment, but the dropdown matches the rest of the settings
+  // pane visually (DeviceField selects, sample-rate selects, etc.).
   const options: { value: ScreenShareCodec; label: string }[] = [
-    { value: 'vp8', label: 'VP8' },
-    { value: 'h264', label: 'H264' },
-    { value: 'vp9', label: 'VP9' },
-    { value: 'av1', label: 'AV1' },
+    { value: 'vp8',  label: 'VP8 · libvpx (рекомендуется)' },
+    { value: 'h264', label: 'H264 · OpenH264' },
+    { value: 'vp9',  label: 'VP9' },
+    { value: 'av1',  label: 'AV1' },
   ];
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs text-fg-muted">Кодек</span>
-      <div
-        role="radiogroup"
-        aria-label="Кодек демонстрации экрана"
-        className="grid grid-cols-4 gap-1 rounded-md bg-bg-muted/50 p-1"
-      >
-        {options.map((opt) => {
-          const active = value === opt.value;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => onChange(opt.value)}
-              className={cn(
-                'rounded-sm px-2 py-1.5 text-xs font-medium transition-colors',
-                active
-                  ? 'bg-bg-elevated text-fg shadow-sm'
-                  : 'text-fg-muted hover:text-fg',
-              )}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <Select value={value} onValueChange={(v) => onChange(v as ScreenShareCodec)}>
+      <SelectTrigger className="w-[260px]">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -555,20 +601,21 @@ function NotificationCornerPicker({
             disabled={disabled}
             onClick={() => onChange(c.value)}
             className={cn(
-              'group relative h-12 rounded-md border transition-colors',
+              'group relative h-12 rounded-md border transition-all',
               active
-                ? 'border-fg/40 bg-bg-elevated'
-                : 'border-border bg-bg-muted/40 hover:border-fg/20 hover:bg-bg-muted/70',
+                ? 'border-white/25 bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_14px_-8px_hsla(240,12%,80%,0.30)]'
+                : 'border-white/[0.06] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.04]',
               disabled && 'cursor-not-allowed',
             )}
           >
-            {/* Мини-«тост» в нужном углу мини-«экрана». 60% ширины миниатюры,
-                чтобы пропорции читались как у реального тоста (360px) на FHD. */}
+            {/* Мини-«тост» в нужном углу мини-«экрана». */}
             <span
               aria-hidden
               className={cn(
-                'absolute h-1.5 w-9 rounded-sm transition-colors',
-                active ? 'bg-fg' : 'bg-fg-subtle group-hover:bg-fg/60',
+                'absolute h-1.5 w-9 rounded-sm transition-all',
+                active
+                  ? 'bg-[linear-gradient(90deg,hsl(240_6%_94%),hsl(240_6%_74%))] shadow-[0_0_8px_hsla(240,12%,80%,0.4)]'
+                  : 'bg-fg-subtle group-hover:bg-fg/60',
                 isRight ? 'right-1.5' : 'left-1.5',
                 isBottom ? 'bottom-1.5' : 'top-1.5',
               )}
@@ -600,7 +647,7 @@ function ScreenSharePresetPicker({
     <div
       role="radiogroup"
       aria-label="Качество демонстрации экрана"
-      className="grid grid-cols-3 gap-1 rounded-md bg-bg-muted/50 p-1"
+      className="grid grid-cols-3 gap-2.5"
     >
       {options.map((opt) => {
         const active = value === opt.value;
@@ -612,13 +659,19 @@ function ScreenSharePresetPicker({
             aria-checked={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'flex flex-col items-center gap-0.5 rounded-sm px-2 py-1 transition-colors',
+              'relative flex flex-col items-start gap-1 rounded-md border p-3.5 text-left transition-all',
               active
-                ? 'bg-bg-elevated text-fg shadow-sm'
-                : 'text-fg-muted hover:text-fg',
+                ? 'border-[hsla(240,10%,92%,0.30)] bg-[hsla(240,8%,70%,0.06)] shadow-[0_4px_20px_-8px_hsla(240,12%,80%,0.25),inset_0_1px_0_rgba(255,255,255,0.06)]'
+                : 'border-[hsla(240,8%,90%,0.08)] bg-[hsla(240,8%,70%,0.04)] hover:border-[hsla(240,8%,90%,0.16)]',
             )}
           >
-            <span className="text-xs font-medium">{opt.label}</span>
+            {active && (
+              <span
+                aria-hidden
+                className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-[hsl(240_8%_92%)] shadow-[0_0_8px_hsla(240,12%,80%,0.5)]"
+              />
+            )}
+            <span className="text-[13px] font-medium text-fg">{opt.label}</span>
             <span className="whitespace-nowrap font-mono text-[10px] tabular-nums text-fg-subtle">
               {opt.sub}
             </span>
@@ -722,24 +775,54 @@ function HotkeyField({
     };
   }, [capturing, onChange]);
 
+  // Split prettyAccel'd combo (e.g. "Ctrl+Shift+M") into per-key chips.
+  const parts = value ? prettyAccel(value).split('+').map((s) => s.trim()) : [];
+
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-sm text-fg">{label}</span>
-      <div className="flex items-center gap-1.5">
-        <Button
+    <div className="flex items-center justify-between gap-6 border-b border-white/[0.05] py-4 last:border-b-0">
+      <span className="text-[13px] font-medium text-fg">{label}</span>
+      <div className="flex shrink-0 items-center gap-1.5">
+        {/* Trigger: kbd-chip row when value is set, otherwise the capture button.
+           Click anywhere on the chips/button enters capture mode. */}
+        <button
           ref={btnRef}
-          variant="outline"
-          size="sm"
+          type="button"
           onClick={() => setCapturing((c) => !c)}
-          className="font-mono text-xs"
+          className={cn(
+            'inline-flex items-center gap-1 rounded-md transition-colors',
+            // Suppress UA outline on mouse-click; soft pearl glow on keyboard focus.
+            'focus:outline-none focus-visible:outline-none',
+            'focus-visible:shadow-[0_0_0_3px_hsla(240,10%,80%,0.10)]',
+            capturing
+              ? 'border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[12px] text-fg'
+              : value
+                ? 'px-1 py-0.5 hover:bg-white/[0.04]'
+                : 'border border-white/10 bg-[linear-gradient(180deg,hsl(240_4%_14%),hsl(240_4%_10%))] px-3 py-1.5 text-[12px] text-fg-muted hover:border-white/[0.14] hover:text-fg',
+          )}
         >
-          <Keyboard />
-          {capturing
-            ? 'Нажмите комбинацию…'
-            : value
-              ? prettyAccel(value)
-              : 'Не задан'}
-        </Button>
+          {capturing ? (
+            <>
+              <Keyboard className="h-3.5 w-3.5" />
+              <span>Нажмите комбинацию…</span>
+            </>
+          ) : value ? (
+            parts.map((p, i) => (
+              <Fragment key={`${p}-${i}`}>
+                {i > 0 && (
+                  <span className="text-[11px] text-fg-subtle">+</span>
+                )}
+                <span className="inline-flex items-center rounded-sm border border-white/10 border-b-[1.5px] border-b-white/20 bg-[linear-gradient(180deg,hsl(240_6%_16%),hsl(240_6%_10%))] px-[9px] py-1 font-mono text-[11px] leading-none tracking-[0.04em] text-fg">
+                  {p}
+                </span>
+              </Fragment>
+            ))
+          ) : (
+            <>
+              <Keyboard className="h-3.5 w-3.5" />
+              <span>Не задан</span>
+            </>
+          )}
+        </button>
         {value && !capturing && (
           <Button
             variant="ghost"
@@ -763,16 +846,18 @@ function ModePicker({
   mode: MicActivationMode;
   onChange: (mode: MicActivationMode) => void;
 }) {
-  const options: { value: MicActivationMode; label: string }[] = [
-    { value: 'always', label: 'Всегда' },
-    { value: 'ptt', label: 'По кнопке' },
-    { value: 'vad', label: 'По голосу' },
+  // Card-style picker — matches mockup .mode-cards (title + description per
+  // card, pearl dot indicator on active). Replaces the old segmented pill.
+  const options: { value: MicActivationMode; title: string; desc: string }[] = [
+    { value: 'always', title: 'Всегда', desc: 'Микрофон открыт, пока ты сам не выключишь.' },
+    { value: 'ptt', title: 'По кнопке', desc: 'Транслирует только пока удерживаешь клавишу.' },
+    { value: 'vad', title: 'По голосу', desc: 'Открывается автоматически, когда заговорил.' },
   ];
   return (
     <div
       role="radiogroup"
       aria-label="Режим активации микрофона"
-      className="grid grid-cols-3 gap-1 rounded-md bg-bg-muted/50 p-1"
+      className="grid grid-cols-3 gap-2.5"
     >
       {options.map((opt) => {
         const active = mode === opt.value;
@@ -784,13 +869,20 @@ function ModePicker({
             aria-checked={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'rounded-sm px-2 py-1.5 text-xs font-medium transition-colors',
+              'relative flex flex-col gap-1 rounded-md border p-3.5 text-left transition-all',
               active
-                ? 'bg-bg-elevated text-fg shadow-sm'
-                : 'text-fg-muted hover:text-fg',
+                ? 'border-[hsla(240,10%,92%,0.30)] bg-[hsla(240,8%,70%,0.06)] shadow-[0_4px_20px_-8px_hsla(240,12%,80%,0.25),inset_0_1px_0_rgba(255,255,255,0.06)]'
+                : 'border-[hsla(240,8%,90%,0.08)] bg-[hsla(240,8%,70%,0.04)] hover:border-[hsla(240,8%,90%,0.16)]',
             )}
           >
-            {opt.label}
+            {active && (
+              <span
+                aria-hidden
+                className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-[hsl(240_8%_92%)] shadow-[0_0_8px_hsla(240,12%,80%,0.5)]"
+              />
+            )}
+            <span className="text-[13px] font-medium text-fg">{opt.title}</span>
+            <span className="text-[11px] leading-relaxed text-fg-subtle">{opt.desc}</span>
           </button>
         );
       })}
@@ -985,43 +1077,60 @@ function LevelMeter({
   );
 }
 
-/**
- * Подзаголовок внутри таба — разделяет логические группы контролов
- * (например, «Звуки» / «Уведомления» / «Окно» в табе "Система"). Спокойный
- * sans, без caps/mono/tracking-трюков — чтобы воспринимался как обычный
- * mini-header, а не editorial-плашка.
- */
-function SubLabel({ children }: { children: ReactNode }) {
-  return <div className="text-xs font-medium text-fg-muted">{children}</div>;
-}
-
-/** Группа контролов внутри таба с собственным sublabel и компактным
- *  внутренним gap (3 ≈ 12px) — родительский gap-5 (20px) применяется
- *  только МЕЖДУ группами, что и создаёт правильную визуальную иерархию. */
-function Group({ title, children }: { title: string; children: ReactNode }) {
+/** Mockup `.mset-row.block` — full-width control with name + optional desc
+ *  stacked above. Used for radio-card pickers (Mode/Preset) and the
+ *  notification-corner picker that doesn't fit the inline left/right pattern.
+ *  Same py-4 + hairline as the inline mset-row so vertical rhythm stays
+ *  consistent through the pane. */
+function Block({
+  title,
+  desc,
+  disabled,
+  children,
+}: {
+  title: string;
+  desc?: string;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <div className="flex flex-col gap-3">
-      <SubLabel>{title}</SubLabel>
-      {children}
+    <div
+      className={cn(
+        'flex flex-col border-b border-white/[0.05] py-4 transition-opacity last:border-b-0',
+        disabled && 'opacity-40',
+      )}
+    >
+      <span className="text-[13px] font-medium text-fg">{title}</span>
+      {desc && (
+        <span className="mt-1 text-[12px] leading-[1.5] text-fg-subtle">{desc}</span>
+      )}
+      <div className="mt-3">{children}</div>
     </div>
   );
 }
 
 function Toggle({
   label,
+  desc,
   checked,
   onChange,
 }: {
   label: string;
+  /** Опциональная подпись под заголовком — описание что делает тоггл. */
+  desc?: string;
   checked: boolean;
   onChange: (v: boolean) => void;
 }) {
-  // <label>, а не <div>: клик по тексту нативно форвардится на первый
-  // focusable child (Radix Switch — button), без htmlFor/id-пляски.
-  // select-none — чтобы быстрый double-click не выделял текст.
+  // Velvet Onyx: mset-row pattern — label + optional desc on left, switch on right,
+  // hairline border-bottom between consecutive rows (group:last suppresses last).
   return (
-    <label className="flex cursor-pointer select-none items-center justify-between gap-4">
-      <span className="text-sm text-fg">{label}</span>
+    <label className="vo-mset-row group/row flex cursor-pointer select-none items-center justify-between gap-6 border-b border-white/[0.05] py-4 last:border-b-0">{/* mset-row pattern: 16px vertical padding + hairline divider */}
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="text-[13px] font-medium text-fg">{label}</span>
+        {desc && (
+          <span className="text-[12px] leading-[1.5] text-fg-subtle">{desc}</span>
+        )}
+      </div>
       <Switch checked={checked} onCheckedChange={onChange} />
     </label>
   );
@@ -1029,12 +1138,15 @@ function Toggle({
 
 function DeviceField({
   label,
+  desc,
   devices,
   value,
   onChange,
   action,
 }: {
   label: string;
+  /** Опциональная подпись под заголовком. */
+  desc?: string;
   devices: MediaDeviceInfo[];
   value: string | null;
   onChange: (v: string | null) => void;
@@ -1042,15 +1154,21 @@ function DeviceField({
   action?: ReactNode;
 }) {
   const SENTINEL = '__default__';
+  // Velvet Onyx: mset-row pattern — name+desc left, control right, hairline border-bottom.
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs text-fg-muted">{label}</span>
-      <div className="flex items-stretch gap-2">
+    <div className="flex items-center justify-between gap-6 border-b border-white/[0.05] py-4 last:border-b-0">
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="text-[13px] font-medium text-fg">{label}</span>
+        {desc && (
+          <span className="text-[12px] leading-[1.5] text-fg-subtle">{desc}</span>
+        )}
+      </div>
+      <div className="flex shrink-0 items-stretch gap-2">
         <Select
           value={value ?? SENTINEL}
           onValueChange={(v) => onChange(v === SENTINEL ? null : v)}
         >
-          <SelectTrigger className="flex-1">
+          <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="По умолчанию" />
           </SelectTrigger>
           <SelectContent>

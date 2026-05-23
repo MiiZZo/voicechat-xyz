@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { RoomEvent, Track, type Participant } from 'livekit-client';
 import { useStore } from '../state/store.js';
 import { useToasts } from '../state/toast-store.js';
@@ -15,10 +16,10 @@ import { ToastTray } from '../components/Toast.js';
 import { SettingsModal } from '../components/SettingsModal.js';
 import { QualityIndicator } from '../components/QualityIndicator.js';
 import { TitleBar, titleBarNoDrag } from '../components/TitleBar.js';
-import { ChevronLeft, Settings } from 'lucide-react';
-import { Button } from '../components/ui/button.js';
+import { ChevronLeft } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { onLeaveRoom } from '../lib/app-actions.js';
+import { cn } from '../lib/cn.js';
 import type { ScreenSource, ScreenSharePreset } from '../../shared/types.js';
 
 type ScreenShareProfile = {
@@ -340,21 +341,27 @@ export function RoomView() {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-bg text-fg">
+    <div className="relative z-[1] flex h-screen flex-col text-fg">
+      {/* Velvet Onyx: vertical rim halo along the chat panel's left edge.
+         Portal'ed into <body> so it's a sibling of #root and sits in body's
+         stacking context (above body bg + body::before drift halo, below .app).
+         The z-[1] above lifts .app over body::before / .vo-halo-2 (both z-0). */}
+      {createPortal(<div className="vo-halo-2" aria-hidden />, document.body)}
+
       <TitleBar className={isFullscreen ? 'hidden' : undefined}>
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
+          type="button"
           onClick={leaveRoom}
-          className="h-7 gap-2 px-2"
+          aria-label="Покинуть комнату"
+          className="inline-flex items-center gap-2 rounded-md py-1 pl-1.5 pr-2.5 text-fg transition-colors hover:bg-white/[0.06]"
           style={titleBarNoDrag}
         >
-          <ChevronLeft />
-          <span className="text-sm font-medium">{activeRoom.roomName}</span>
+          <ChevronLeft className="h-3.5 w-3.5 text-fg-muted" />
+          <span className="text-[13px] font-medium">{activeRoom.roomName}</span>
           <span className="font-mono text-xs tabular-nums text-fg-subtle">
             {participants.length}/8
           </span>
-        </Button>
+        </button>
         <div className="ml-auto flex items-center gap-2">
           {room && (
             <Tooltip>
@@ -378,53 +385,83 @@ export function RoomView() {
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-subtle">
             {state}
           </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Настройки"
-            className="h-7 w-7"
-            style={titleBarNoDrag}
-          >
-            <Settings />
-          </Button>
         </div>
       </TitleBar>
 
-      <main className="flex flex-1 overflow-hidden">
-        <section className="flex-1 overflow-y-auto p-5">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            {participants.map((p) => (
-              <ParticipantTile
-                key={p.identity}
-                p={p}
-                big={p === screenShareParticipant}
-                videoSource={p === screenShareParticipant ? Track.Source.ScreenShare : Track.Source.Camera}
-                quality={qualities.get(p.identity)}
-              />
-            ))}
-          </div>
+      <main className="relative flex flex-1 overflow-hidden">
+        {/* Bottom padding clears the floating ControlBar (~52px high + 18px gap). */}
+        <section
+          className={cn(
+            'flex-1 p-5 pb-[88px]',
+            // Screen-share scene: contained flex-col layout — big tile fills the
+            // remaining height, strip stays at its fixed height. No vertical
+            // scroll appears even at fullscreen with many participants.
+            screenShareParticipant
+              ? 'flex flex-col gap-3 overflow-hidden'
+              : 'overflow-y-auto',
+          )}
+        >
+          {screenShareParticipant ? (
+            <>
+              {/* Big share tile fills remaining vertical space. */}
+              <div className="min-h-0 flex-1">
+                <ParticipantTile
+                  key={`share-${screenShareParticipant.identity}`}
+                  p={screenShareParticipant}
+                  big
+                  fill
+                  videoSource={Track.Source.ScreenShare}
+                  quality={qualities.get(screenShareParticipant.identity)}
+                />
+              </div>
+              {/* Participants strip — fixed-height horizontal scroll, mirrors
+                  mockup .ss-strip. Sharer is included as their camera tile so
+                  the strip is the canonical list of who's in the room. */}
+              <div className="flex h-[110px] shrink-0 gap-2.5 overflow-x-auto pb-1">
+                {participants.map((p) => (
+                  <div key={p.identity} className="aspect-[4/3] h-full shrink-0">
+                    <ParticipantTile
+                      p={p}
+                      fill
+                      videoSource={Track.Source.Camera}
+                      quality={qualities.get(p.identity)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-3 gap-3 lg:grid-cols-4">
+              {participants.map((p) => (
+                <ParticipantTile
+                  key={p.identity}
+                  p={p}
+                  videoSource={Track.Source.Camera}
+                  quality={qualities.get(p.identity)}
+                />
+              ))}
+            </div>
+          )}
         </section>
         {room && (
           <div className={isFullscreen ? 'hidden' : 'contents'}>
             <ChatPanel room={room} />
           </div>
         )}
-      </main>
 
-      {room && (
-        <div className={isFullscreen ? 'hidden' : 'contents'}>
+        {room && !isFullscreen && (
           <ControlBar
             room={room}
             onLeave={leaveRoom}
+            onOpenSettings={() => setSettingsOpen(true)}
             remoteSharing={remoteSharing}
             onToggleScreenShare={onToggleScreenShare}
             micActivationMode={prefs?.micActivationMode ?? 'always'}
             pttHeld={pttHeld}
             vadOpen={vadOpen}
           />
-        </div>
-      )}
+        )}
+      </main>
 
       {pickerPromise && (
         <ScreenSourcePicker

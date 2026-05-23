@@ -15,7 +15,8 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/70 backdrop-blur-sm',
+      // Velvet Onyx: heavier blur + softer overlay color
+      'fixed inset-0 z-50 bg-[hsla(240,12%,3%,0.55)] backdrop-blur-xl',
       'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className,
     )}
@@ -33,8 +34,14 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-[50%] top-[50%] z-50 grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-5 rounded-lg border border-border bg-bg-elevated p-6 shadow-2xl',
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+        // Velvet Onyx: glass card with gradient halo + heavy drop shadow
+        'fixed left-[50%] top-[50%] z-50 grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-5 overflow-hidden rounded-[14px] border border-white/[0.14] p-6',
+        'bg-[radial-gradient(ellipse_55%_40%_at_0%_0%,hsla(240,10%,78%,0.10),transparent_60%),radial-gradient(ellipse_50%_40%_at_100%_100%,hsla(240,8%,60%,0.06),transparent_60%),linear-gradient(160deg,hsl(240_8%_10%)_0%,hsl(240_12%_5%)_100%)]',
+        'shadow-[0_32px_80px_-16px_rgba(0,0,0,0.7),inset_0_1px_0_hsla(240,10%,92%,0.06)]',
+        // Hand-written center-origin animation — tailwindcss-animate's
+        // zoom-in-X strips the translate during the animation, causing a
+        // top-left corner snap. vo-modal-anim preserves translate(-50%,-50%).
+        'vo-modal-anim',
         className,
       )}
       {...props}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type DragEvent } from 'react';
 import { RoomEvent, type Room, type RemoteParticipant } from 'livekit-client';
-import { ArrowUp, Copy, ClipboardCopy, Paperclip, Download, Loader2, AlertCircle, X } from 'lucide-react';
+import { ArrowUp, Copy, ClipboardCopy, Paperclip, Download, Loader2, AlertCircle, X, File as FileIcon, Upload } from 'lucide-react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { useStore, type ChatMessage, type FileMessage } from '../state/store.js';
 import { Avatar, AvatarFallback, AvatarImage, avatarColor, customAvatar } from './ui/avatar.js';
@@ -239,17 +239,14 @@ export function ChatPanel({ room }: { room: Room }) {
 
   return (
     <aside
-      className="relative flex w-80 flex-col border-l border-border bg-bg-elevated/30"
+      className="vo-chat-bg vo-chat-rim relative flex w-80 flex-col"
       onDragEnter={onDragEnter}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      <div className="flex items-baseline gap-2 border-b border-border px-4 py-3">
+      <div className="relative flex items-baseline justify-center gap-2 px-4 py-3.5 after:absolute after:bottom-0 after:left-5 after:right-5 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/10 after:to-transparent after:content-['']">
         <span className="text-sm font-semibold tracking-tight text-fg">Чат</span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-subtle">
-          live
-        </span>
       </div>
 
       <div ref={listRef} className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
@@ -264,15 +261,24 @@ export function ChatPanel({ room }: { room: Room }) {
         })}
       </div>
 
-      <form onSubmit={sendText} className="border-t border-border p-3">
-        <div className="relative flex items-center">
+      <form
+        onSubmit={sendText}
+        className="vo-msg-halo relative p-3"
+      >
+        {/* Hairline divider between chat list and form (Tailwind ::after instead
+            of the previous ::before — ::before is now claimed by vo-msg-halo). */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-5 right-5 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"
+        />
+        <div className="relative z-10 flex items-center">
           <button
             type="button"
             aria-label="Прикрепить файл"
             onClick={() => fileInputRef.current?.click()}
-            className="absolute left-1 flex h-8 w-8 items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-bg-muted hover:text-fg"
+            className="absolute left-1 flex h-[30px] w-[30px] items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-white/[0.06] hover:text-fg focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20"
           >
-            <Paperclip size={16} strokeWidth={2.25} />
+            <Paperclip size={14} strokeWidth={2.25} />
           </button>
           <Input
             value={text}
@@ -286,9 +292,9 @@ export function ChatPanel({ room }: { room: Room }) {
             type="submit"
             aria-label="Отправить"
             disabled={!text.trim()}
-            className="absolute right-1 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-fg transition-colors hover:bg-accent/90 disabled:bg-bg-muted disabled:text-fg-subtle"
+            className="absolute right-1 flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[linear-gradient(180deg,hsl(240_6%_98%),hsl(240_6%_82%))] text-bg shadow-[0_2px_8px_-2px_hsla(240,12%,80%,0.18)] transition-colors hover:bg-[linear-gradient(180deg,hsl(240_6%_100%),hsl(240_6%_86%))] focus:outline-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_hsla(240,10%,80%,0.18)] disabled:bg-bg-muted disabled:bg-none disabled:text-fg-subtle disabled:shadow-none"
           >
-            <ArrowUp size={18} strokeWidth={2.5} />
+            <ArrowUp size={14} strokeWidth={2.5} />
           </button>
           <input
             ref={fileInputRef}
@@ -304,9 +310,13 @@ export function ChatPanel({ room }: { room: Room }) {
       </form>
 
       {isDragging && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-accent/15 backdrop-blur-sm">
-          <div className="rounded-md border-2 border-dashed border-accent bg-bg-elevated/90 px-5 py-3 text-sm font-medium text-fg">
-            Отпустите, чтобы отправить
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-bg/40 p-4 backdrop-blur-md">
+          <div className="vo-lift-tile w-full rounded-lg border-[1.5px] border-dashed border-white/40 bg-bg-elevated/70 px-5 py-6 text-center backdrop-blur-2xl backdrop-saturate-150">
+            <div className="mx-auto mb-3.5 flex h-[42px] w-[42px] items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,hsla(0,0%,100%,0.35),transparent_50%),radial-gradient(circle_at_50%_50%,hsl(240_8%_32%)_0%,hsl(240_10%_12%)_80%)] text-fg shadow-[0_0_24px_hsla(240,12%,80%,0.20),inset_0_-3px_8px_rgba(0,0,0,0.4),inset_0_2px_4px_rgba(255,255,255,0.08)]">
+              <Upload size={18} />
+            </div>
+            <div className="text-sm font-medium text-fg">Отпустите, чтобы отправить</div>
+            <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-fg-subtle">До 50 МБ · drag &amp; drop</div>
           </div>
         </div>
       )}
@@ -358,14 +368,16 @@ function MessageRow({ message, isLocal }: { message: ChatMessage; isLocal: boole
               isLocal && 'items-end',
             )}
           >
-            <span className="text-[10px] uppercase tracking-wider text-fg-subtle">
+            <span className="px-0.5 text-[11.5px] font-medium tracking-[-0.005em] text-fg-muted">
               {isLocal ? 'ты' : message.fromName}
             </span>
             {message.kind === 'text' ? (
               <div
                 className={cn(
-                  'max-w-full rounded-2xl border border-border bg-bg-muted/60 px-3 py-2 text-sm text-fg [overflow-wrap:anywhere]',
-                  isLocal ? 'rounded-tr-sm' : 'rounded-tl-sm',
+                  'relative max-w-full rounded-2xl px-3.5 py-2 text-[13px] leading-[1.5] [overflow-wrap:anywhere]',
+                  isLocal
+                    ? 'vo-lift-bubble-pearl border border-transparent bg-[linear-gradient(180deg,hsl(240_6%_96%)_0%,hsl(240_6%_80%)_100%)] text-bg rounded-tr-sm'
+                    : 'vo-lift-bubble border border-white/[0.08] bg-white/[0.06] text-fg backdrop-blur-xl backdrop-saturate-150 rounded-tl-sm',
                 )}
               >
                 <span className="whitespace-pre-wrap">{linkify(message.text)}</span>
@@ -433,7 +445,7 @@ function FileBubble({ message, isLocal }: { message: FileMessage; isLocal: boole
       <>
         <div
           className={cn(
-            'max-w-full overflow-hidden rounded-2xl border border-border bg-bg-muted/60',
+            'vo-lift-bubble max-w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.06] backdrop-blur-xl backdrop-saturate-150',
             isLocal ? 'rounded-tr-sm' : 'rounded-tl-sm',
           )}
         >
@@ -452,7 +464,7 @@ function FileBubble({ message, isLocal }: { message: FileMessage; isLocal: boole
               <img
                 src={message.url}
                 alt={message.name}
-                className="block max-h-64 w-full object-cover"
+                className="block max-h-[150px] w-full object-cover"
                 loading="lazy"
               />
             </button>
@@ -475,21 +487,23 @@ function FileBubble({ message, isLocal }: { message: FileMessage; isLocal: boole
   return (
     <div
       className={cn(
-        'flex max-w-full items-center gap-3 rounded-2xl border border-border bg-bg-muted/60 px-3 py-2',
-        isLocal ? 'rounded-tr-sm' : 'rounded-tl-sm',
+        'flex max-w-full items-center gap-3 rounded-2xl px-3 py-2',
+        isLocal
+          ? 'vo-lift-bubble-pearl border border-transparent bg-[linear-gradient(180deg,hsl(240_6%_96%)_0%,hsl(240_6%_80%)_100%)] text-bg rounded-tr-sm'
+          : 'vo-lift-bubble border border-white/[0.08] bg-white/[0.06] text-fg backdrop-blur-xl backdrop-saturate-150 rounded-tl-sm',
       )}
     >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center text-fg-muted">
-        {errored ? <AlertCircle size={18} /> : <FileExtIcon name={message.name} mime={message.mime} />}
+      <div className="flex shrink-0 items-center justify-center">
+        {errored ? <AlertCircle size={18} className={isLocal ? 'text-bg/60' : 'text-fg-muted'} /> : <FileExtIcon name={message.name} isLocal={isLocal} />}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span
-          className="truncate text-sm font-medium text-fg [overflow-wrap:anywhere]"
+          className={cn('truncate text-[13px] font-medium [overflow-wrap:anywhere]', isLocal ? 'text-bg' : 'text-fg')}
           title={message.name}
         >
           {message.name}
         </span>
-        <span className="text-[11px] text-fg-subtle">
+        <span className={cn('font-mono text-[11px] tracking-[0.02em]', isLocal ? 'text-bg/55' : 'text-fg-subtle')}>
           {errored
             ? message.errorReason ?? 'Ошибка'
             : uploading
@@ -502,13 +516,18 @@ function FileBubble({ message, isLocal }: { message: FileMessage; isLocal: boole
           type="button"
           aria-label="Скачать"
           onClick={() => void handleDownload()}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-bg-elevated hover:text-fg"
+          className={cn(
+            'flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors',
+            isLocal
+              ? 'border-black/15 bg-black/10 text-bg/70 hover:bg-black/20 hover:text-bg'
+              : 'border-white/[0.08] bg-white/[0.06] text-fg-muted hover:bg-white/[0.1] hover:text-fg',
+          )}
         >
-          <Download size={16} />
+          <Download size={13} />
         </button>
       )}
       {uploading && (
-        <Loader2 size={16} className="shrink-0 animate-spin text-fg-muted" />
+        <Loader2 size={16} className={cn('shrink-0 animate-spin', isLocal ? 'text-bg/60' : 'text-fg-muted')} />
       )}
     </div>
   );
@@ -520,66 +539,35 @@ function extOf(name: string): string {
   return m[1].slice(0, 4).toUpperCase();
 }
 
-function colorForExt(ext: string, mime: string): string {
-  const e = ext.toLowerCase();
-  if (mime.startsWith('image/')) return '#a855f7';
-  if (mime.startsWith('audio/')) return '#10b981';
-  if (mime.startsWith('video/')) return '#f97316';
-  if (['exe', 'msi', 'bat', 'cmd', 'sh', 'app', 'dmg'].includes(e)) return '#dc2626';
-  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(e)) return '#9333ea';
-  if (e === 'pdf') return '#ef4444';
-  if (e === 'torrent') return '#0ea5e9';
-  if (['doc', 'docx', 'odt', 'rtf', 'txt'].includes(e)) return '#2563eb';
-  if (['xls', 'xlsx', 'csv', 'ods'].includes(e)) return '#16a34a';
-  if (['ppt', 'pptx', 'odp'].includes(e)) return '#ea580c';
-  if (['js', 'ts', 'tsx', 'jsx', 'json', 'html', 'css', 'py', 'go', 'rs', 'java', 'c', 'cpp', 'cs', 'rb', 'php'].includes(e)) return '#eab308';
-  return '#64748b';
-}
-
-function FileExtIcon({ name, mime }: { name: string; mime: string }) {
+/** Velvet Onyx file glyph: small glass plaque with a clipped top-right corner +
+ *  generic file outline + monospace extension chip below. No format-specific
+ *  bright colors — keeps the chat reading as a single calm surface. */
+function FileExtIcon({ name, isLocal }: { name: string; isLocal: boolean }) {
   const ext = extOf(name);
-  const color = colorForExt(ext, mime);
-  // Badge width grows with text length so 2-4 char extensions all look balanced.
-  const badgeW = Math.min(30, Math.max(20, ext.length * 7 + 8));
-  const badgeX = (32 - badgeW) / 2;
   return (
-    <svg
-      width="22"
-      height="28"
-      viewBox="0 0 32 40"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
+    <div
+      className={cn(
+        'relative flex h-[46px] w-[38px] flex-col items-center justify-center gap-1 rounded-sm border',
+        isLocal
+          ? 'border-black/15 bg-gradient-to-br from-black/15 to-black/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.08)]'
+          : 'border-white/[0.08] bg-gradient-to-br from-white/[0.10] to-white/[0.04] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_1px_2px_rgba(0,0,0,0.3)]',
+      )}
       aria-hidden="true"
     >
-      <path
-        d="M5 3a2 2 0 0 1 2-2h13l8 8v28a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V3Z"
-        fill="currentColor"
-        fillOpacity="0.08"
-        stroke="currentColor"
-        strokeOpacity="0.5"
-        strokeWidth="1"
+      <FileIcon className={cn('h-3.5 w-3.5', isLocal ? 'text-bg/70' : 'text-fg-muted')} />
+      <span className={cn(
+        'font-mono text-[8px] font-medium uppercase tracking-[0.12em]',
+        isLocal ? 'text-bg/55' : 'text-fg-subtle',
+      )}>{ext}</span>
+      {/* Folded-corner cue at the top-right */}
+      <div
+        className={cn(
+          'absolute right-0 top-0 h-2 w-2',
+          isLocal ? 'bg-black/20' : 'bg-zinc-900/80',
+        )}
+        style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }}
       />
-      <path
-        d="M20 1v7a2 2 0 0 0 2 2h6"
-        stroke="currentColor"
-        strokeOpacity="0.5"
-        strokeWidth="1"
-        strokeLinejoin="round"
-      />
-      <rect x={badgeX} y={21} width={badgeW} height={15} rx={2.5} fill={color} />
-      <text
-        x={16}
-        y={32}
-        textAnchor="middle"
-        fontSize="11"
-        fontWeight={700}
-        letterSpacing="0.3"
-        fill="#ffffff"
-        fontFamily="system-ui, -apple-system, sans-serif"
-      >
-        {ext}
-      </text>
-    </svg>
+    </div>
   );
 }
 

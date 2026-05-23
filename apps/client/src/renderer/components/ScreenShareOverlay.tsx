@@ -4,6 +4,7 @@ import { type Participant, Track } from 'livekit-client';
 import { Slider } from './ui/slider.js';
 import { useStore } from '../state/store.js';
 import { useReceiverStats } from '../hooks/useReceiverStats.js';
+import { cn } from '../lib/cn.js';
 
 type Props = {
   participant: Participant;
@@ -78,14 +79,17 @@ export function ScreenShareOverlay({
 
   return (
     <div
-      // Позиция: ниже status chips (top-2 right-2, w-6 каждый ≈ 24px высотой),
-      // справа экрана. top-12 = 48px от верха, безопасно ниже chips.
-      // Фиксированная ширина w-72 = 288px чтобы slider имел достаточно места
-      // (раньше w-24=96px было визуально мелко в fullscreen). С flex-1 слайдер
-      // тянется от mute-кнопки до %-индикатора без неожиданных отступов.
-      // WebkitAppRegion: 'no-drag' — defense, на случай если tile-level
-      // no-drag будет когда-нибудь убран.
-      className="absolute right-2 top-12 flex w-72 flex-col gap-2 rounded-md bg-black/60 px-3 py-2 backdrop-blur opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+      // Velvet Onyx fullscreen overlay — glass card with mockup .big-share-meta
+      // styling. Positioned top-right, below status chips. Fades in on hover or
+      // when any control inside is focused. WebkitAppRegion no-drag prevents
+      // the OS-level drag-handler from stealing clicks in fullscreen.
+      className={cn(
+        'absolute right-3 top-3 flex w-72 flex-col gap-2 rounded-md px-3 py-2.5',
+        'border border-white/[0.10] bg-[hsla(240,6%,8%,0.78)]',
+        'backdrop-blur-xl backdrop-saturate-150',
+        'shadow-[0_16px_40px_-12px_rgba(0,0,0,0.6),inset_0_1px_0_hsla(240,10%,92%,0.06)]',
+        'opacity-0 transition-opacity duration-200 group-hover:opacity-100 focus-within:opacity-100',
+      )}
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
@@ -95,11 +99,15 @@ export function ScreenShareOverlay({
           <button
             type="button"
             onClick={toggleScreenMute}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-fg hover:bg-white/10"
+            className={cn(
+              'flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-fg transition-colors',
+              'hover:bg-white/[0.08] focus:outline-none focus-visible:outline-none focus-visible:bg-white/[0.08]',
+              screenMuted && 'text-rose-300',
+            )}
             title={screenMuted ? 'Включить звук' : 'Отключить звук'}
             aria-label={screenMuted ? 'Включить звук' : 'Отключить звук'}
           >
-            {screenMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+            {screenMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
           </button>
           <Slider
             className="flex-1"
@@ -111,13 +119,13 @@ export function ScreenShareOverlay({
             onValueChange={(v) => setScreenVolume(v[0] ?? 1)}
             aria-label="Громкость"
           />
-          <span className="w-10 shrink-0 text-right font-mono text-[11px] tabular-nums text-fg-subtle">
+          <span className="w-10 shrink-0 text-right font-mono text-[10px] tabular-nums text-fg-subtle">
             {Math.round(screenVolume * 100)}%
           </span>
         </div>
       )}
       {stats && (
-        <span className="text-right font-mono text-[10px] tabular-nums text-fg-subtle">
+        <span className="text-right font-mono text-[10px] tracking-[0.04em] tabular-nums text-fg-subtle">
           {stats.fps} fps · {stats.bitrateMbps} Mbps
         </span>
       )}

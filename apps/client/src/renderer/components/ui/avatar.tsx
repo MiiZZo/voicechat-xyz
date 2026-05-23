@@ -43,7 +43,10 @@ const AvatarFallback = React.forwardRef<
   <AvatarPrimitive.Fallback
     ref={ref}
     className={cn(
-      'flex h-full w-full items-center justify-center rounded-full bg-bg-muted text-fg font-medium',
+      // No default text color — vo-avatar-N classes set it (color matches
+      // mockup .tile-avatar: dark var(--bg) on light pearl gradient bg).
+      // If no vo-avatar-N is passed, text inherits from parent.
+      'flex h-full w-full items-center justify-center rounded-full bg-bg-muted font-medium',
       className,
     )}
     {...props}
@@ -51,16 +54,13 @@ const AvatarFallback = React.forwardRef<
 ));
 AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName;
 
-/** Deterministic warm-tone background per name — no two adjacent participants get the same tile color. */
+/** Velvet Onyx: deterministic neutral-zinc gradient per name. 7 hue-shifted
+ *  variants all stay in the cool/neutral range (no warm primary colors) so the
+ *  chat reads as one calm surface. Defined as CSS classes in index.css. */
 export function avatarColor(name: string): string {
   const palette = [
-    'bg-amber-900/40 text-amber-200',
-    'bg-rose-900/40 text-rose-200',
-    'bg-emerald-900/40 text-emerald-200',
-    'bg-sky-900/40 text-sky-200',
-    'bg-violet-900/40 text-violet-200',
-    'bg-orange-900/40 text-orange-200',
-    'bg-teal-900/40 text-teal-200',
+    'vo-avatar-1', 'vo-avatar-2', 'vo-avatar-3', 'vo-avatar-4',
+    'vo-avatar-5', 'vo-avatar-6', 'vo-avatar-7',
   ];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;

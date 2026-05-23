@@ -33,7 +33,14 @@ export function TitleBar({ children, className }: Props) {
   return (
     <header
       className={cn(
-        'flex h-9 w-full shrink-0 items-stretch border-b border-border bg-bg',
+        // Velvet Onyx: floating bar — translucent bg + blur + heavy drop shadow
+        // so it visually elevates above the stage. Hairline gradient at the
+        // bottom (after) replaces the old hard border-b.
+        'vo-lift-titlebar relative z-[6] flex h-9 w-full shrink-0 items-stretch',
+        // Exact mockup .titlebar bg: hsla(240, 10%, 6%, 0.55) — darker and
+        // slightly cooler than bg-elevated/55 (which swapped S/L by accident).
+        'bg-[hsla(240,10%,6%,0.55)] backdrop-blur-xl',
+        "after:pointer-events-none after:absolute after:bottom-0 after:left-6 after:right-6 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/5 after:to-transparent after:content-['']",
         className,
       )}
       style={dragStyle}

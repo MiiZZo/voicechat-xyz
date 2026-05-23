@@ -1,28 +1,101 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  /* Layout-related tokens. --chat-w mirrors the ChatPanel's actual width
+     and is consumed by the rim-light positioning below. */
+  :root {
+    --chat-w: 320px;
+  }
+
   html, body, #root { height: 100%; margin: 0; }
   body {
     font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: 'cv11', 'ss01';
     -webkit-font-smoothing: antialiased;
     color-scheme: dark;
+    overflow: hidden;
+    position: relative;
+    /* Velvet Onyx — static atmospheric halos baked into body background.
+       Composes with `bg-bg` (background-color), which still anchors the base. */
+    background-image:
+      radial-gradient(ellipse 55% 45% at 18% 8%,  hsla(240, 10%, 70%, 0.10), transparent 60%),
+      radial-gradient(ellipse 60% 45% at 90% 18%, hsla(240,  8%, 78%, 0.05), transparent 65%),
+      radial-gradient(ellipse 80% 55% at 50% 115%, hsla(240, 10%, 60%, 0.08), transparent 65%);
   }
 
-  /* Faint grain — adds warmth to the dark surfaces, very subtle */
+  /* === Velvet Onyx: Light 1 — orbital halo around the first-participant area ===
+     Slow linear 8-point circle (40s) — feels like a slow planetary rotation.
+     Sits on top of body bg, below .app content (z 0 vs .app z 1). */
   body::before {
+    content: '';
+    position: fixed;
+    width: 52vmax; height: 52vmax;
+    top: 22vmax; left: 22vmax;
+    background: radial-gradient(circle at center, hsla(240, 14%, 86%, 0.30) 0%, transparent 50%);
+    filter: blur(55px);
+    pointer-events: none;
+    z-index: 0;
+    animation:
+      orbit-light-1 40s linear infinite,
+      light-breath-1 9s ease-in-out infinite alternate;
+  }
+
+  /* === Velvet Onyx: noise grain — top of the entire stack. === */
+  body::after {
     content: '';
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 100;
-    opacity: 0.025;
+    z-index: 1000;
+    opacity: 0.035;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/></svg>");
   }
+
+  /* === Velvet Onyx: Light 2 — vertical rim along the chat panel's left edge ===
+     Defines the chat/stage boundary by lighting the seam itself instead of
+     drawing a hard divider. Hidden if --chat-w is 0 (responsive narrow). */
+  .vo-halo-2 {
+    position: fixed;
+    width: 28vmax;
+    height: 110vmax;
+    top: -5vmax;
+    left: calc(100vw - var(--chat-w));
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse 55% 85% at 50% 50%, hsla(240, 14%, 85%, 0.22) 0%, transparent 65%);
+    filter: blur(65px);
+    pointer-events: none;
+    z-index: 0;
+    animation: light-breath-2 11s ease-in-out infinite alternate;
+  }
+
+  @keyframes orbit-light-1 {
+    /* 8-point circular path, radius 18vmax, around (22vmax, 22vmax) */
+    0%    { transform: translate(-50%, -50%) translate(18vmax, 0); }
+    12.5% { transform: translate(-50%, -50%) translate(12.7vmax, -12.7vmax); }
+    25%   { transform: translate(-50%, -50%) translate(0, -18vmax); }
+    37.5% { transform: translate(-50%, -50%) translate(-12.7vmax, -12.7vmax); }
+    50%   { transform: translate(-50%, -50%) translate(-18vmax, 0); }
+    62.5% { transform: translate(-50%, -50%) translate(-12.7vmax, 12.7vmax); }
+    75%   { transform: translate(-50%, -50%) translate(0, 18vmax); }
+    87.5% { transform: translate(-50%, -50%) translate(12.7vmax, 12.7vmax); }
+    100%  { transform: translate(-50%, -50%) translate(18vmax, 0); }
+  }
+  @keyframes light-breath-1 {
+    0%, 100% { opacity: 0.82; }
+    50%      { opacity: 1.00; }
+  }
+  @keyframes light-breath-2 {
+    0%, 100% { opacity: 0.78; }
+    50%      { opacity: 1.00; }
+  }
+
+  /* Responsive chat width — keep in sync with .chat width in components below. */
+  @media (max-width: 900px) { :root { --chat-w: 280px; } }
+  @media (max-width: 680px) { :root { --chat-w: 0px; } }
 
   ::selection { background: hsl(0 0% 100% / 0.18); color: hsl(0 0% 98%); }
 
@@ -36,4 +109,226 @@
   *::-webkit-scrollbar-track { background: transparent; }
   *::-webkit-scrollbar-thumb { background: hsl(240 4% 16%); border-radius: 3px; }
   *::-webkit-scrollbar-thumb:hover { background: hsl(240 4% 22%); }
+}
+
+@layer components {
+  /* === Velvet Onyx: speaking-state outer pearl glow + pulse ===
+     Applied via ::after so the tile's own box-shadow (drop + halo) stays put.
+     The pulse modulates a pearl ring growing outward from the tile edge. */
+  .vo-speaking::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    animation: vo-speaking-pulse 1.6s ease-out infinite;
+  }
+  @keyframes vo-speaking-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 hsla(240, 14%, 90%, 0); }
+    50%      { box-shadow: 0 0 0 6px hsla(240, 14%, 90%, 0.22), 0 0 32px -8px hsla(240, 14%, 90%, 0.30); }
+  }
+
+  /* === Velvet Onyx: levitation shadow utilities for chat bubbles & tiles ===
+     Pre-baked combinations so components don't need verbose arbitrary values. */
+  .vo-lift-bubble {
+    box-shadow:
+      inset 0 1px 0 hsla(0, 0%, 100%, 0.08),
+      inset 0 -0.5px 0 hsla(0, 0%, 0%, 0.18),
+      0 16px 36px -10px rgba(0, 0, 0, 0.55),
+      0 4px 12px -2px rgba(0, 0, 0, 0.30),
+      0 0 64px -28px hsla(240, 14%, 80%, 0.14);
+  }
+  .vo-lift-bubble-pearl {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.60),
+      inset 0 -1px 0 hsla(240, 8%, 50%, 0.18),
+      0 18px 38px -10px hsla(240, 12%, 70%, 0.45),
+      0 6px 16px -3px hsla(240, 10%, 55%, 0.32),
+      0 0 60px -18px hsla(240, 14%, 88%, 0.28);
+  }
+  .vo-lift-tile {
+    box-shadow:
+      inset 0 1px 0 hsla(0, 0%, 100%, 0.10),
+      0 24px 48px -10px rgba(0, 0, 0, 0.72),
+      0 8px 18px -4px rgba(0, 0, 0, 0.45),
+      0 0 50px -22px hsla(240, 14%, 80%, 0.12);
+  }
+  .vo-lift-titlebar {
+    box-shadow:
+      0 34px 64px -10px rgba(0, 0, 0, 0.88),
+      0 18px 32px -8px rgba(0, 0, 0, 0.65),
+      0 8px 14px -4px rgba(0, 0, 0, 0.50);
+  }
+  .vo-lift-dock {
+    /* Single outer drop shadow only — the previous bottom inset pearl glow
+       leaked past the dock's pill into a visible "white strip" under the
+       buttons, and the top inset highlight competed with the border for the
+       same 1px line. vo-dock-rim::before now provides the highlight. */
+    box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.65);
+  }
+
+  /* === Velvet Onyx avatar palette — neutral zinc gradients with subtle hue shift.
+     Each tone is a radial gradient (light to dark) with a dark inset rim for
+     depth + soft top highlight. text color is dark (bg) for contrast. === */
+  .vo-avatar-1 {
+    background: radial-gradient(circle at 35% 30%, hsl(240 8% 88%) 0%, hsl(240 6% 56%) 100%);
+    color: hsl(240 10% 4%);
+    box-shadow: inset 0 -3px 8px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.10);
+  }
+  .vo-avatar-2 {
+    background: radial-gradient(circle at 35% 30%, hsl(220 12% 78%) 0%, hsl(220 8% 44%) 100%);
+    color: hsl(240 10% 4%);
+    box-shadow: inset 0 -3px 8px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.10);
+  }
+  .vo-avatar-3 {
+    background: radial-gradient(circle at 35% 30%, hsl(260 6% 76%) 0%, hsl(260 4% 40%) 100%);
+    color: hsl(240 10% 4%);
+    box-shadow: inset 0 -3px 8px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.10);
+  }
+  .vo-avatar-4 {
+    background: radial-gradient(circle at 35% 30%, hsl(200 10% 76%) 0%, hsl(200 6% 42%) 100%);
+    color: hsl(240 10% 4%);
+    box-shadow: inset 0 -3px 8px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.10);
+  }
+  .vo-avatar-5 {
+    background: radial-gradient(circle at 35% 30%, hsl(180 6% 78%) 0%, hsl(180 4% 38%) 100%);
+    color: hsl(240 10% 4%);
+    box-shadow: inset 0 -3px 8px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.10);
+  }
+  .vo-avatar-6 {
+    background: radial-gradient(circle at 35% 30%, hsl(40 8% 80%) 0%, hsl(40 6% 48%) 100%);
+    color: hsl(240 10% 4%);
+    box-shadow: inset 0 -3px 8px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.10);
+  }
+  .vo-avatar-7 {
+    background: radial-gradient(circle at 35% 30%, hsl(280 6% 76%) 0%, hsl(280 4% 42%) 100%);
+    color: hsl(240 10% 4%);
+    box-shadow: inset 0 -3px 8px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.10);
+  }
+
+  /* === Velvet Onyx tile background — subtle radial highlight + linear base */
+  .vo-tile-bg {
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 40%, hsla(240, 8%, 18%, 0.6), transparent 70%),
+      linear-gradient(160deg, hsl(240 6% 10%) 0%, hsl(240 12% 3%) 100%);
+  }
+
+  /* === Velvet Onyx glass chip (used for name pill, mic/cam/quality indicators) */
+  .vo-chip {
+    background: hsla(240, 10%, 4%, 0.55);
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    border: 1px solid hsla(240, 8%, 90%, 0.08);
+  }
+
+  /* === ChatPanel surface — vertical gradient + saturate, mirrors mockup .chat. */
+  .vo-chat-bg {
+    background: linear-gradient(180deg, hsla(240, 6%, 10%, 0.35) 0%, hsla(240, 6%, 8%, 0.35) 100%);
+    backdrop-filter: blur(20px) saturate(120%);
+    -webkit-backdrop-filter: blur(20px) saturate(120%);
+  }
+
+  /* === Message-glow halo at the chat-form boundary.
+     The actual box-shadow on a local message bubble is clipped by .chat-list's
+     overflow-y-auto, so the pearl glow never visually reaches the input area.
+     vo-msg-halo paints a soft pearl uplight as a ::before on the chat-form
+     element. It extends UP (top: -56px) past the form border into the chat
+     list's visual zone (which doesn't clip siblings, only descendants), and
+     down a bit into the form area too — so the input pill sits inside a soft
+     halo that mimics light bleeding off the last few message bubbles. */
+  .vo-msg-halo::before {
+    content: '';
+    position: absolute;
+    top: -56px;
+    left: 12px;
+    right: 12px;
+    height: 110px;
+    background: radial-gradient(ellipse 70% 55% at 55% 45%, hsla(240, 14%, 88%, 0.16) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* Vertical hair-strong line on the chat's LEFT edge — mockup .chat::before. */
+  .vo-chat-rim::before {
+    content: '';
+    position: absolute;
+    top: 24px;
+    bottom: 24px;
+    left: 0;
+    width: 1px;
+    background: linear-gradient(180deg,
+      transparent 0%,
+      hsla(0, 0%, 100%, 0.10) 20%,
+      hsla(0, 0%, 100%, 0.10) 80%,
+      transparent 100%);
+    pointer-events: none;
+  }
+
+  /* === ControlBar rim — diagonal gradient hairline via mask-composite.
+     Sits inset:-1px around the pill. Kept subtle (~0.10 peak) so it reads as
+     light reflection on a glass edge, not a bright accent stroke. Pairs with
+     the dock's regular border for the full effect — the gradient adds a
+     diagonal highlight on top of the uniform border below. */
+  .vo-dock-rim::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg,
+      hsla(240, 10%, 92%, 0.10),
+      hsla(240, 10%, 92%, 0.01) 45%,
+      transparent 80%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* === Tile mic indicator — 24px circle. Three states. */
+  .vo-tile-mic {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: hsla(240, 10%, 4%, 0.55);
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: hsl(0 0% 98%);
+  }
+  .vo-tile-mic-muted { color: hsl(346 77% 49%); }
+  .vo-tile-mic-on {
+    background: linear-gradient(180deg, hsl(240 6% 96%), hsl(240 6% 78%));
+    color: hsl(240 10% 4%);
+  }
+
+  /* === Modal enter/exit — true center-origin scale + fade.
+     tailwindcss-animate's `zoom-in-95` writes `transform: translate3d(0,0,0) scale(...)`
+     which DESTROYS the modal's static `translate(-50%, -50%)` for the animation's
+     duration, making it visibly snap from the top-left corner. We hand-write the
+     keyframes including the -50/-50 translate so the modal stays centered the
+     whole way through. */
+  @keyframes vo-modal-in {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  @keyframes vo-modal-out {
+    from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    to   { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+  }
+  .vo-modal-anim[data-state="open"]   { animation: vo-modal-in  240ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .vo-modal-anim[data-state="closed"] { animation: vo-modal-out 160ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+  /* === Toast pulse dot — green w/ glow. Used in success/info toasts. */
+  .vo-toast-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: hsl(140 60% 55%);
+    box-shadow: 0 0 8px hsl(140 60% 55%);
+    flex-shrink: 0;
+  }
 }

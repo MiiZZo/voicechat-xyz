@@ -14,7 +14,10 @@ const TooltipContent = React.forwardRef<
     ref={ref}
     sideOffset={sideOffset}
     className={cn(
-      'z-50 overflow-hidden rounded-md border border-border bg-bg-elevated px-2.5 py-1 text-xs text-fg shadow-lg',
+      // Velvet Onyx: glass plaque tooltip
+      'z-50 overflow-hidden rounded-md border border-white/[0.14] bg-bg-elevated/85 px-2.5 py-1 text-xs text-fg',
+      'backdrop-blur-xl backdrop-saturate-150',
+      'shadow-[0_12px_32px_-8px_rgba(0,0,0,0.7),inset_0_1px_0_hsla(0,0%,100%,0.06)]',
       'animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
       className,
     )}

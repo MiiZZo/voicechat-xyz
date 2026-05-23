@@ -60,16 +60,14 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="w-64">
-        <ContextMenuLabel className="text-xs font-semibold normal-case tracking-normal text-fg">
+        {/* Top label = participant's name. Override the default uppercase
+            tracking so the name stays readable. */}
+        <ContextMenuLabel className="text-[13px] font-medium normal-case tracking-normal text-fg">
           {participantName}
         </ContextMenuLabel>
         <ContextMenuSeparator />
 
-        {/* SubLabel-style категория (text-xs font-medium text-fg-muted) — тот
-            же паттерн mini-header'а, что и Group title в SettingsModal. */}
-        <ContextMenuLabel className="px-2 pt-1 pb-0 text-xs font-medium text-fg-muted">
-          Голос
-        </ContextMenuLabel>
+        <ContextMenuLabel>Голос</ContextMenuLabel>
         <ContextMenuItem
           onSelect={(e) => {
             e.preventDefault();
@@ -99,9 +97,7 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
         {hasScreenShareAudio && (
           <>
             <ContextMenuSeparator />
-            <ContextMenuLabel className="px-2 pt-1 pb-0 text-xs font-medium text-fg-muted">
-              Экран
-            </ContextMenuLabel>
+            <ContextMenuLabel>Экран</ContextMenuLabel>
             <ContextMenuItem
               onSelect={(e) => {
                 e.preventDefault();

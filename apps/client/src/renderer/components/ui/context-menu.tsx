@@ -11,6 +11,12 @@ const ContextMenuPortal = ContextMenuPrimitive.Portal;
 const ContextMenuSub = ContextMenuPrimitive.Sub;
 const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
 
+// Shared Velvet Onyx item style — pearl-tint on focus/highlight, never zinc.
+const itemBaseClasses =
+  'relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-[13px] text-fg outline-none transition-colors ' +
+  'focus:bg-white/[0.08] focus:text-fg data-[highlighted]:bg-white/[0.08] data-[highlighted]:text-fg ' +
+  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50';
+
 const ContextMenuSubTrigger = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.SubTrigger>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubTrigger> & { inset?: boolean }
@@ -18,17 +24,26 @@ const ContextMenuSubTrigger = React.forwardRef<
   <ContextMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
-      'flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-zinc-800 focus:text-zinc-50 data-[state=open]:bg-zinc-800 data-[state=open]:text-zinc-50',
+      itemBaseClasses,
+      'data-[state=open]:bg-white/[0.08] data-[state=open]:text-fg',
       inset && 'pl-8',
       className,
     )}
     {...props}
   >
     {children}
-    <ChevronRight className="ml-auto h-4 w-4" />
+    <ChevronRight className="ml-auto h-4 w-4 opacity-60" />
   </ContextMenuPrimitive.SubTrigger>
 ));
 ContextMenuSubTrigger.displayName = ContextMenuPrimitive.SubTrigger.displayName;
+
+// Shared Velvet Onyx surface — glass card with radial halo + heavy shadow.
+const surfaceClasses =
+  'z-50 overflow-hidden rounded-md border border-white/[0.10] p-1 text-fg ' +
+  'bg-[radial-gradient(ellipse_60%_50%_at_0%_0%,hsla(240,10%,78%,0.08),transparent_60%),linear-gradient(160deg,hsl(240_8%_10%)_0%,hsl(240_12%_5%)_100%)] ' +
+  'backdrop-blur-xl backdrop-saturate-150 ' +
+  'shadow-[0_24px_60px_-16px_rgba(0,0,0,0.7),inset_0_1px_0_hsla(240,10%,92%,0.06)] ' +
+  'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95';
 
 const ContextMenuSubContent = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.SubContent>,
@@ -36,10 +51,7 @@ const ContextMenuSubContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ContextMenuPrimitive.SubContent
     ref={ref}
-    className={cn(
-      'z-50 min-w-[8rem] overflow-hidden rounded-md border border-zinc-800 bg-zinc-900 p-1 text-zinc-100 shadow-md',
-      className,
-    )}
+    className={cn(surfaceClasses, 'min-w-[8rem]', className)}
     {...props}
   />
 ));
@@ -52,10 +64,7 @@ const ContextMenuContent = React.forwardRef<
   <ContextMenuPrimitive.Portal>
     <ContextMenuPrimitive.Content
       ref={ref}
-      className={cn(
-        'z-50 min-w-[10rem] overflow-hidden rounded-md border border-zinc-800 bg-zinc-900 p-1 text-zinc-100 shadow-lg',
-        className,
-      )}
+      className={cn(surfaceClasses, 'min-w-[10rem]', className)}
       {...props}
     />
   </ContextMenuPrimitive.Portal>
@@ -68,11 +77,7 @@ const ContextMenuItem = React.forwardRef<
 >(({ className, inset, ...props }, ref) => (
   <ContextMenuPrimitive.Item
     ref={ref}
-    className={cn(
-      'relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-zinc-800 focus:text-zinc-50 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
-      inset && 'pl-8',
-      className,
-    )}
+    className={cn(itemBaseClasses, inset && 'pl-8', className)}
     {...props}
   />
 ));
@@ -84,10 +89,7 @@ const ContextMenuCheckboxItem = React.forwardRef<
 >(({ className, children, checked, ...props }, ref) => (
   <ContextMenuPrimitive.CheckboxItem
     ref={ref}
-    className={cn(
-      'relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-zinc-800 focus:text-zinc-50 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
-      className,
-    )}
+    className={cn(itemBaseClasses, 'pl-8 pr-2', className)}
     checked={checked}
     {...props}
   >
@@ -107,10 +109,7 @@ const ContextMenuRadioItem = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <ContextMenuPrimitive.RadioItem
     ref={ref}
-    className={cn(
-      'relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-zinc-800 focus:text-zinc-50 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
-      className,
-    )}
+    className={cn(itemBaseClasses, 'pl-8 pr-2', className)}
     {...props}
   >
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
@@ -129,7 +128,7 @@ const ContextMenuLabel = React.forwardRef<
 >(({ className, inset, ...props }, ref) => (
   <ContextMenuPrimitive.Label
     ref={ref}
-    className={cn('px-2 py-1.5 text-xs font-medium text-zinc-400', inset && 'pl-8', className)}
+    className={cn('px-2 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-fg-subtle', inset && 'pl-8', className)}
     {...props}
   />
 ));
@@ -141,14 +140,14 @@ const ContextMenuSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ContextMenuPrimitive.Separator
     ref={ref}
-    className={cn('-mx-1 my-1 h-px bg-zinc-800', className)}
+    className={cn('-mx-1 my-1 h-px bg-white/[0.06]', className)}
     {...props}
   />
 ));
 ContextMenuSeparator.displayName = ContextMenuPrimitive.Separator.displayName;
 
 const ContextMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => (
-  <span className={cn('ml-auto text-xs tracking-widest text-zinc-500', className)} {...props} />
+  <span className={cn('ml-auto text-[11px] tracking-wider text-fg-subtle', className)} {...props} />
 );
 ContextMenuShortcut.displayName = 'ContextMenuShortcut';
 

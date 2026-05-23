@@ -17,11 +17,17 @@ import { QualityIndicator } from './QualityIndicator.js';
 type Props = {
   p: Participant;
   big?: boolean;
+  /** When true, the tile fills its parent's full height/width instead of
+   *  enforcing an aspect-ratio. Used by the screen-share scene where the
+   *  big share tile lives inside a flex-1 wrapper that already constrains
+   *  its size — adding aspect-video on top would oversize the tile and
+   *  cause the page to scroll. */
+  fill?: boolean;
   videoSource?: Track.Source;
   quality?: ConnectionQuality;
 };
 
-export function ParticipantTile({ p, big = false, videoSource = Track.Source.Camera, quality }: Props) {
+export function ParticipantTile({ p, big = false, fill = false, videoSource = Track.Source.Camera, quality }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tileRef = useRef<HTMLDivElement | null>(null);
@@ -484,10 +490,20 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       // в этой полосе уходят OS-level window-drag-handler'у и двигают окно.
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       className={cn(
-        'group relative flex aspect-video items-center justify-center overflow-hidden rounded-xl border bg-bg-elevated transition-shadow',
-        speaking ? 'border-accent/80 shadow-[0_0_0_1px_hsl(0_0%_100%/0.3)]' : 'border-border',
-        speaking && 'animate-speaking-pulse',
-        big && 'col-span-2 row-span-2',
+        // Velvet Onyx: gradient bg + heavy drop shadow + outer pearl pulse on speak
+        'group relative flex items-center justify-center overflow-hidden rounded-xl border transition-all',
+        // Sizing: `fill` overrides aspect-ratio so the tile fills its flex/grid
+        // parent (used by the big share + strip tiles in screen-share scene).
+        fill
+          ? 'h-full w-full'
+          : videoSource === Track.Source.ScreenShare
+            ? 'aspect-video'
+            : 'aspect-[4/3]',
+        'vo-tile-bg vo-lift-tile',
+        speaking ? 'vo-speaking border-white/30' : 'border-white/[0.08]',
+        // col-span-2 row-span-2 kept for grid contexts where a tile needs to span;
+        // no-op when the tile is rendered outside a grid (e.g. screen-share scene).
+        big && !fill && videoSource !== Track.Source.ScreenShare && 'col-span-2 row-span-2',
       )}
     >
       {showVideo ? (
@@ -518,7 +534,7 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         <button
           type="button"
           onClick={togglePip}
-          className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-fg opacity-0 backdrop-blur transition-opacity hover:bg-black/80 group-hover:opacity-100 focus-visible:opacity-100"
+          className="vo-chip absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-md text-fg opacity-0 transition-opacity hover:bg-white/[0.10] group-hover:opacity-100 focus-visible:opacity-100"
           aria-label={isInPip ? 'Закрыть Picture-in-Picture' : 'Picture-in-Picture'}
           title={isInPip ? 'Закрыть Picture-in-Picture' : 'Picture-in-Picture'}
         >
@@ -530,11 +546,22 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         <button
           type="button"
           onClick={requestFullscreen}
-          className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-fg opacity-0 backdrop-blur transition-opacity hover:bg-black/80 group-hover:opacity-100 focus-visible:opacity-100"
+          className={cn(
+            'vo-chip absolute flex items-center justify-center rounded-md text-fg opacity-0 transition-opacity hover:bg-white/[0.10] group-hover:opacity-100 focus-visible:opacity-100',
+            // Screen-share tile: prominent centered "На весь экран" CTA — the
+            // broadcast is the focal element, so the action lives in the middle
+            // instead of a tiny corner chip. Camera tiles keep the corner chip.
+            videoSource === Track.Source.ScreenShare
+              ? 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 gap-2 px-4 py-2.5'
+              : 'bottom-2 right-2 h-7 w-7',
+          )}
           aria-label="Открыть на весь экран"
           title="Открыть на весь экран (двойной клик, F)"
         >
-          <Maximize2 className="h-3.5 w-3.5" />
+          <Maximize2 className={cn(videoSource === Track.Source.ScreenShare ? 'h-4 w-4' : 'h-3.5 w-3.5')} />
+          {videoSource === Track.Source.ScreenShare && (
+            <span className="text-[13px] font-medium">На весь экран</span>
+          )}
         </button>
       )}
 
@@ -546,47 +573,66 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         />
       )}
 
-      {/* Status chips — top right */}
+      {/* Quality chip — top LEFT (per Velvet Onyx mockup .tile-quality) */}
+      {quality !== undefined && quality !== ConnectionQuality.Excellent && (
+        <span
+          className="vo-chip absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full"
+          title="Качество соединения"
+        >
+          <QualityIndicator quality={quality} />
+        </span>
+      )}
+
+      {/* Status chips — top right (remote mute / cam-off etc.) */}
       <div className="absolute right-2 top-2 flex items-center gap-1">
-        {quality !== undefined && quality !== ConnectionQuality.Excellent && (
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 backdrop-blur" title="Качество соединения">
-            <QualityIndicator quality={quality} />
-          </span>
-        )}
-        {micOff && (
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-rose-300 backdrop-blur">
-            <MicOff size={12} />
-          </span>
-        )}
         {camOff && !micOff && showVideo === false && (
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-fg-subtle backdrop-blur">
+          <span className="vo-chip flex h-6 w-6 items-center justify-center rounded-full text-fg-subtle">
             <VideoOff size={12} />
           </span>
         )}
         {muted && (
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-950/80 text-rose-300 backdrop-blur" title="Замьючен локально">
+          <span
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-rose-500/20 bg-rose-950/60 text-rose-300 backdrop-blur"
+            title="Замьючен локально"
+          >
             <VolumeX size={12} />
           </span>
         )}
       </div>
 
-      {/* Name pill — bottom left */}
-      <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 text-xs backdrop-blur">
-        {videoSource === Track.Source.ScreenShare && (
-          <Monitor size={11} className="text-fg-subtle" aria-label="Демонстрация экрана" />
-        )}
-        {!micOff && (
-          <Mic size={11} className={cn(speaking ? 'text-fg' : 'text-fg-subtle')} />
-        )}
-        <span className="font-medium text-fg">{p.name}</span>
-        {p.isLocal && <span className="text-fg-subtle">·  ты</span>}
+      {/* Foot — name pill (left) + mic chip (right) */}
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
+        <span className="vo-chip flex min-w-0 items-center gap-1.5 truncate rounded-md px-2 py-1 text-xs">
+          {videoSource === Track.Source.ScreenShare && (
+            <Monitor size={11} className="shrink-0 text-fg-subtle" aria-label="Демонстрация экрана" />
+          )}
+          <span className="truncate font-medium text-fg">{p.name}</span>
+          {p.isLocal && (
+            <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.15em] text-fg-subtle">
+              · ты
+            </span>
+          )}
+        </span>
+        <span
+          className={cn(
+            'vo-tile-mic',
+            micOff && 'vo-tile-mic-muted',
+            !micOff && speaking && 'vo-tile-mic-on',
+          )}
+          title={micOff ? 'Микрофон выключен' : speaking ? 'Говорит' : 'Микрофон активен'}
+        >
+          {micOff ? <MicOff size={12} /> : <Mic size={12} />}
+        </span>
       </div>
     </div>
   );
 
   if (p.isLocal) return tile;
   return (
-    <ParticipantContextMenu participantName={participantKey} hasScreenShareAudio={hasScreenShareAudio}>
+    <ParticipantContextMenu
+      participantName={participantKey}
+      hasScreenShareAudio={hasScreenShareAudio}
+    >
       {tile}
     </ParticipantContextMenu>
   );
