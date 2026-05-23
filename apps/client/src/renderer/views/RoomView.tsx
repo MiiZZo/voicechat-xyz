@@ -68,6 +68,18 @@ export function RoomView() {
   // (zustand action), поэтому подписку привязываем к нему напрямую.
   useEffect(() => onLeaveRoom(leaveRoom), [leaveRoom]);
 
+  // Когда любой тайл уходит в fullscreen, надо скрыть остальной chrome
+  // (TitleBar, ChatPanel, ControlBar). Браузерный Fullscreen API в теории
+  // делает это сам через top-layer, но на практике в Electron/Tauri WebView2
+  // chrome всё равно "просвечивает" внизу экрана (пользовательский report).
+  // Поэтому делаем явный hidden через React state.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
   useEffect(() => {
     if (!room) return;
     const refresh = () => {
@@ -329,7 +341,7 @@ export function RoomView() {
 
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
-      <TitleBar>
+      <TitleBar className={isFullscreen ? 'hidden' : undefined}>
         <Button
           variant="ghost"
           size="sm"
@@ -393,19 +405,25 @@ export function RoomView() {
             ))}
           </div>
         </section>
-        {room && <ChatPanel room={room} />}
+        {room && (
+          <div className={isFullscreen ? 'hidden' : 'contents'}>
+            <ChatPanel room={room} />
+          </div>
+        )}
       </main>
 
       {room && (
-        <ControlBar
-          room={room}
-          onLeave={leaveRoom}
-          remoteSharing={remoteSharing}
-          onToggleScreenShare={onToggleScreenShare}
-          micActivationMode={prefs?.micActivationMode ?? 'always'}
-          pttHeld={pttHeld}
-          vadOpen={vadOpen}
-        />
+        <div className={isFullscreen ? 'hidden' : 'contents'}>
+          <ControlBar
+            room={room}
+            onLeave={leaveRoom}
+            remoteSharing={remoteSharing}
+            onToggleScreenShare={onToggleScreenShare}
+            micActivationMode={prefs?.micActivationMode ?? 'always'}
+            pttHeld={pttHeld}
+            vadOpen={vadOpen}
+          />
+        </div>
       )}
 
       {pickerPromise && (

@@ -415,6 +415,25 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     };
   }, [audioGraphTick, screenAudioGraphTick]);
 
+  // F — тогл fullscreen для screen-share тайла. YouTube/Twitch/VLC convention.
+  // Слушаем document keydown, но только на screen-share тайле и только когда
+  // фокус не в text input (чтобы не ловить F при наборе сообщения в чате).
+  // Esc уже обрабатывается браузером для exit fullscreen.
+  useEffect(() => {
+    if (videoSource !== Track.Source.ScreenShare || p.isLocal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'f' && e.key !== 'F' && e.key !== 'а' && e.key !== 'А') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      const editable = (e.target as HTMLElement | null)?.isContentEditable;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || editable) return;
+      e.preventDefault();
+      requestFullscreen();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [videoSource, p.isLocal]);
+
   const micPub = p.getTrackPublication(Track.Source.Microphone);
   const camPub = p.getTrackPublication(videoSource);
   const speaking = p.isSpeaking;
@@ -468,9 +487,9 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         <button
           type="button"
           onClick={requestFullscreen}
-          className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-fg opacity-0 backdrop-blur transition-opacity hover:bg-black/80 group-hover:opacity-100 focus-visible:opacity-100"
+          className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-fg opacity-0 backdrop-blur transition-opacity hover:bg-black/80 group-hover:opacity-100 focus-visible:opacity-100"
           aria-label="Открыть на весь экран"
-          title="Открыть на весь экран (двойной клик)"
+          title="Открыть на весь экран (двойной клик, F)"
         >
           <Maximize2 className="h-3.5 w-3.5" />
         </button>
