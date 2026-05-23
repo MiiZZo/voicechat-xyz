@@ -63,11 +63,7 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
         <ContextMenuLabel className="text-xs font-semibold normal-case tracking-normal text-fg">
           {participantName}
         </ContextMenuLabel>
-
         <ContextMenuSeparator />
-        <ContextMenuLabel className="px-2 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-fg-subtle">
-          Голос
-        </ContextMenuLabel>
         <ContextMenuItem
           onSelect={(e) => {
             e.preventDefault();
@@ -78,6 +74,7 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
           {muted ? <Volume2 /> : <VolumeX />}
           <span>{muted ? 'Включить звук' : 'Отключить звук'}</span>
         </ContextMenuItem>
+        <ContextMenuSeparator />
         <div className="flex items-center gap-3 px-2 py-2">
           <span className="text-xs text-fg-muted">Громкость</span>
           <Slider
@@ -93,13 +90,9 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
             {Math.round(volume * 100)}%
           </span>
         </div>
-
         {hasScreenShareAudio && (
           <>
             <ContextMenuSeparator />
-            <ContextMenuLabel className="px-2 pt-1 pb-0.5 text-[10px] font-medium uppercase tracking-wider text-fg-subtle">
-              Демонстрация экрана
-            </ContextMenuLabel>
             <ContextMenuItem
               onSelect={(e) => {
                 e.preventDefault();
@@ -110,8 +103,9 @@ export function ParticipantContextMenu({ participantName, hasScreenShareAudio, c
               {screenMuted ? <Volume2 /> : <VolumeX />}
               <span>{screenMuted ? 'Включить звук демки' : 'Отключить звук демки'}</span>
             </ContextMenuItem>
+            <ContextMenuSeparator />
             <div className="flex items-center gap-3 px-2 py-2">
-              <span className="text-xs text-fg-muted">Громкость</span>
+              <span className="text-xs text-fg-muted">Громкость демки</span>
               <Slider
                 className="flex-1"
                 value={[screenVolume]}

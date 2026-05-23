@@ -6,7 +6,7 @@ import {
   type Participant,
   type TrackPublication,
 } from 'livekit-client';
-import { Mic, MicOff, VideoOff, VolumeX, Maximize2, Monitor } from 'lucide-react';
+import { Mic, MicOff, VideoOff, VolumeX, Maximize2, Monitor, PictureInPicture2 } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { useStore } from '../state/store.js';
 import { Avatar, AvatarFallback, AvatarImage, avatarColor, customAvatar } from './ui/avatar.js';
@@ -415,6 +415,37 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
     };
   }, [audioGraphTick, screenAudioGraphTick]);
 
+  // PiP toggle для screen-share тайла. Listener на enter/leave события
+  // (используем capture phase: эти события не bubble'ятся per spec).
+  // Re-render тоже идёт через rerender() цепочку на ParticipantEvent — но
+  // PiP события приходят отдельно, поэтому слушаем явно.
+  const [, setPipTick] = useState(0);
+  useEffect(() => {
+    if (p.isLocal || videoSource !== Track.Source.ScreenShare) return;
+    const bump = () => setPipTick((n) => n + 1);
+    document.addEventListener('enterpictureinpicture', bump, true);
+    document.addEventListener('leavepictureinpicture', bump, true);
+    return () => {
+      document.removeEventListener('enterpictureinpicture', bump, true);
+      document.removeEventListener('leavepictureinpicture', bump, true);
+    };
+  }, [p.isLocal, videoSource]);
+  const isInPip =
+    !!videoRef.current && document.pictureInPictureElement === videoRef.current;
+  const togglePip = async () => {
+    const el = videoRef.current;
+    if (!el) return;
+    try {
+      if (document.pictureInPictureElement === el) {
+        await document.exitPictureInPicture();
+      } else {
+        await el.requestPictureInPicture();
+      }
+    } catch (e) {
+      console.warn('[pip] toggle failed', e);
+    }
+  };
+
   // F — тогл fullscreen для screen-share тайла. YouTube/Twitch/VLC convention.
   // Слушаем document keydown, но только на screen-share тайле и только когда
   // фокус не в text input (чтобы не ловить F при наборе сообщения в чате).
@@ -483,6 +514,18 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
       {!p.isLocal && <audio ref={audioRef} autoPlay />}
       {!p.isLocal && <audio ref={screenAudioRef} autoPlay />}
 
+      {!p.isLocal && videoSource === Track.Source.ScreenShare && showVideo && (
+        <button
+          type="button"
+          onClick={togglePip}
+          className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-fg opacity-0 backdrop-blur transition-opacity hover:bg-black/80 group-hover:opacity-100 focus-visible:opacity-100"
+          aria-label={isInPip ? 'Закрыть Picture-in-Picture' : 'Picture-in-Picture'}
+          title={isInPip ? 'Закрыть Picture-in-Picture' : 'Picture-in-Picture'}
+        >
+          <PictureInPicture2 className="h-3.5 w-3.5" />
+        </button>
+      )}
+
       {showVideo && (
         <button
           type="button"
@@ -499,7 +542,6 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         <ScreenShareOverlay
           participant={p}
           participantKey={participantKey}
-          videoElement={videoRef.current}
           hasScreenShareAudio={hasScreenShareAudio}
         />
       )}
