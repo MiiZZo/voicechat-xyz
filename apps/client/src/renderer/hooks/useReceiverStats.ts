@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   ParticipantEvent,
+  RemoteAudioTrack,
+  RemoteVideoTrack,
   Track,
   type Participant,
-  type RemoteAudioTrack,
-  type RemoteVideoTrack,
 } from 'livekit-client';
 
 export type ReceiverStats = {
@@ -44,11 +44,11 @@ export function useReceiverStats(p: Participant, source: Track.Source): Receiver
   useEffect(() => {
     const pub = p.getTrackPublication(source);
     const track = pub?.track;
-    // RemoteVideoTrack / RemoteAudioTrack экспозят .receiver. Базовый Track
-    // его не имеет — нужен type-narrow.
+    // instanceof — корректный type narrow для классов livekit-client, без
+    // ручного cast'а. Базовый Track не экспозит .receiver, только Remote* подтипы.
     const receiver =
-      track && 'receiver' in track
-        ? (track as RemoteVideoTrack | RemoteAudioTrack).receiver
+      track instanceof RemoteVideoTrack || track instanceof RemoteAudioTrack
+        ? track.receiver
         : null;
     if (!receiver) {
       setStats(null);
@@ -66,7 +66,11 @@ export function useReceiverStats(p: Participant, source: Track.Source): Receiver
       let fps = 0;
       let bytes = 0;
       let ts = 0;
-      report.forEach((s) => {
+      report.forEach((value) => {
+        // RTCStatsReport.forEach types `value` as `any` in lib.dom.d.ts, so
+        // narrow explicitly to RTCInboundRtpStreamStats to get real field
+        // typecheck (catches typos like bytesReceived → byteReceived).
+        const s = value as RTCInboundRtpStreamStats;
         if (s.type === 'inbound-rtp' && s.kind === 'video') {
           fps = s.framesPerSecond ?? 0;
           bytes = s.bytesReceived ?? 0;
@@ -75,7 +79,9 @@ export function useReceiverStats(p: Participant, source: Track.Source): Receiver
       });
       if (prevTs > 0 && ts > prevTs) {
         const dtSec = (ts - prevTs) / 1000;
-        const dBytes = bytes - prevBytes;
+        // Clamp at 0: byte counter может сброситься (например, при свитче
+        // simulcast-слоя), и без clamp UI мигнёт отрицательным Mbps.
+        const dBytes = Math.max(0, bytes - prevBytes);
         const bps = (dBytes * 8) / dtSec;
         setStats({
           fps: Math.round(fps),
