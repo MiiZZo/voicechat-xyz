@@ -11,6 +11,7 @@ import { cn } from '../lib/cn.js';
 import { useStore } from '../state/store.js';
 import { Avatar, AvatarFallback, AvatarImage, avatarColor, customAvatar } from './ui/avatar.js';
 import { ParticipantContextMenu } from './ParticipantContextMenu.js';
+import { ScreenShareOverlay } from './ScreenShareOverlay.js';
 import { QualityIndicator } from './QualityIndicator.js';
 
 type Props = {
@@ -459,6 +460,15 @@ export function ParticipantTile({ p, big = false, videoSource = Track.Source.Cam
         >
           <Maximize2 className="h-3.5 w-3.5" />
         </button>
+      )}
+
+      {!p.isLocal && videoSource === Track.Source.ScreenShare && (
+        <ScreenShareOverlay
+          participant={p}
+          participantKey={participantKey}
+          videoElement={videoRef.current}
+          hasScreenShareAudio={hasScreenShareAudio}
+        />
       )}
 
       {/* Status chips — top right */}
