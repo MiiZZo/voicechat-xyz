@@ -276,7 +276,11 @@ export function ChatPanel({ room }: { room: Room }) {
             type="button"
             aria-label="Прикрепить файл"
             onClick={() => fileInputRef.current?.click()}
-            className="absolute left-1 flex h-[30px] w-[30px] items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-white/[0.06] hover:text-fg focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20"
+            // z-10 явный: WRY webview hit-testing на полностью прозрачных
+            // absolute элементах (no bg, no border) иногда пропускает их в
+            // пользу нижележащего static Input — клик уходит на Input и тот
+            // получает focus. Explicit z-index ставит button точно сверху.
+            className="absolute left-1 z-10 flex h-[30px] w-[30px] items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-white/[0.06] hover:text-fg focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20"
           >
             <Paperclip size={14} strokeWidth={2.25} />
           </button>
@@ -292,7 +296,7 @@ export function ChatPanel({ room }: { room: Room }) {
             type="submit"
             aria-label="Отправить"
             disabled={!text.trim()}
-            className="absolute right-1 flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[linear-gradient(180deg,hsl(240_6%_98%),hsl(240_6%_82%))] text-bg shadow-[0_2px_8px_-2px_hsla(240,12%,80%,0.18)] transition-colors hover:bg-[linear-gradient(180deg,hsl(240_6%_100%),hsl(240_6%_86%))] focus:outline-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_hsla(240,10%,80%,0.18)] disabled:bg-bg-muted disabled:bg-none disabled:text-fg-subtle disabled:shadow-none"
+            className="absolute right-1 z-10 flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[linear-gradient(180deg,hsl(240_6%_98%),hsl(240_6%_82%))] text-bg shadow-[0_2px_8px_-2px_hsla(240,12%,80%,0.18)] transition-colors hover:bg-[linear-gradient(180deg,hsl(240_6%_100%),hsl(240_6%_86%))] focus:outline-none focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_hsla(240,10%,80%,0.18)] disabled:bg-bg-muted disabled:bg-none disabled:text-fg-subtle disabled:shadow-none"
           >
             <ArrowUp size={14} strokeWidth={2.5} />
           </button>
@@ -316,8 +320,8 @@ export function ChatPanel({ room }: { room: Room }) {
       </form>
 
       {isDragging && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-bg/40 p-4 backdrop-blur-md">
-          <div className="vo-lift-tile w-full rounded-lg border-[1.5px] border-dashed border-white/40 bg-bg-elevated/70 px-5 py-6 text-center backdrop-blur-2xl backdrop-saturate-150">
+        <div className="pointer-events-none absolute inset-0 z-20 flex animate-in fade-in-0 items-center justify-center bg-bg/40 p-4 backdrop-blur-md duration-200">
+          <div className="vo-lift-tile w-full animate-in fade-in-0 zoom-in-95 rounded-lg border-[1.5px] border-dashed border-white/40 bg-bg-elevated/70 px-5 py-6 text-center backdrop-blur-2xl backdrop-saturate-150 duration-300">
             <div className="mx-auto mb-3.5 flex h-[42px] w-[42px] items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,hsla(0,0%,100%,0.35),transparent_50%),radial-gradient(circle_at_50%_50%,hsl(240_8%_32%)_0%,hsl(240_10%_12%)_80%)] text-fg shadow-[0_0_24px_hsla(240,12%,80%,0.20),inset_0_-3px_8px_rgba(0,0,0,0.4),inset_0_2px_4px_rgba(255,255,255,0.08)]">
               <Upload size={18} />
             </div>
