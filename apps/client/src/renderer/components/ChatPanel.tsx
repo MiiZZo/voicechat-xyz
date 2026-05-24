@@ -296,11 +296,17 @@ export function ChatPanel({ room }: { room: Room }) {
           >
             <ArrowUp size={14} strokeWidth={2.5} />
           </button>
+          {/* sr-only вместо className="hidden": display:none инпуты в некоторых
+              WebView engines (Tauri/WRY на macOS особенно) игнорируют
+              программный .click() — нативный file picker не открывается.
+              sr-only визуально прячет но оставляет элемент в layout, и
+              click работает на всех платформах. */}
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            className="hidden"
+            className="sr-only"
+            tabIndex={-1}
             onChange={(e) => {
               void onFilesPicked(e.target.files);
               e.target.value = '';

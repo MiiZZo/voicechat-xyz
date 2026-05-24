@@ -23,7 +23,8 @@
         "backgroundColor": "#09090b",
         "resizable": true,
         "fullscreen": false,
-        "visible": true
+        "visible": true,
+        "dragDropEnabled": false
       },
       {
         "label": "notification",
