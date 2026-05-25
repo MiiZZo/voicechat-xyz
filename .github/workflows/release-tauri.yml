@@ -58,10 +58,6 @@ jobs:
         run: node scripts/generate-icons.mjs
 
       - name: write vite env
-        # apps/client/.env.local-server гитигнорится, поэтому в CI его нет.
-        # Создаём env-файл явно. Дефолт vite.config.ts тоже указывает на prod
-        # (см. соответствующий коммит) — этот шаг страхует на случай, когда
-        # нужно собрать на staging-URL через repo variable VITE_LOBBY_URL.
         shell: bash
         working-directory: apps/client-tauri
         env:
@@ -70,11 +66,9 @@ jobs:
           printf 'VITE_LOBBY_URL=%s\n' "$VITE_LOBBY_URL" > .env.local-server
           echo "--- .env.local-server ---"
           cat .env.local-server
-          echo "--- .env.* listing ---"
-          ls -la .env* || true
 
       - name: build & publish
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v0.5.23
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -84,16 +78,14 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'VoiceChat (Tauri) v__VERSION__'
           releaseBody: 'Автосборка Tauri-клиента. См. ассеты для установки.'
-          releaseDraft: true
+          # Публикуем сразу — draft/pre-release ломали «Latest» и давали split-release.
+          releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }}
 
       - name: assert lobby URL is baked into bundle
-        # Защита от регрессии env-проброса: если в собранном dist/*.js остался
-        # дефолтный localhost-URL — значит env не подхватился, и установщик
-        # выйдет нерабочим. Лучше упасть в CI, чем выпустить мёртвый релиз.
         shell: bash
         working-directory: apps/client-tauri
         env:
@@ -113,3 +105,21 @@ jobs:
             exit 1
           fi
           echo "OK: $EXPECTED_URL is baked into bundle"
+
+  # После всех matrix-джобов: один release, latest.json с URL на правильный tag.
+  finalize:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: normalize release & latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --draft=false --prerelease=false --latest=true
+          node apps/client-tauri/scripts/fix-latest-json.mjs
