@@ -6,144 +6,262 @@
 
 ## 1. Behaviour summary
 
-| Scenario at launch                          | UX                                                                                          |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| No update available                         | Splash flashes "Проверка обновлений…" briefly, then fades out; main window appears.         |
-| Update available, download succeeds         | Splash shows progress 0–100%, then "Установка…", then app restarts on new version.          |
-| Update available, download fails            | Splash shows "Ошибка загрузки, продолжаем" for 1.5s, then closes; main window appears.      |
-| Updater server unreachable / check times out (20s) | Splash shows "Не удалось проверить, продолжаем"; main window appears with old version.      |
-| Dev build (`debug_assertions`)              | Splash flow is skipped entirely; main window opens immediately as today.                    |
-| `VOICECHAT_SKIP_UPDATE=1` env var           | Splash flow is skipped; useful for release-build manual testing.                            |
+| Scenario at launch                                 | UX                                                                                          |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| No update available                                | Splash shows "Проверка обновлений…" briefly, then "Обновлений нет" 300ms, then main appears. |
+| Update available, download succeeds                | Splash shows progress 0–100%, then "Установка…", then app restarts on new version.          |
+| Update available, download fails                   | Splash shows "Ошибка загрузки, продолжаем" for 1.5s, then main appears (old version).        |
+| Updater server unreachable / check times out (20s) | Splash shows "Не удалось проверить, продолжаем" 1.5s, then main appears.                     |
+| Splash JS never reports ready (5s handshake fails) | Rust skips updater, closes splash, shows main. (Safety valve for broken splash bundle.)      |
+| Dev build (`debug_assertions`)                     | Splash never opens. Main shows immediately as today.                                         |
+| `VOICECHAT_SKIP_UPDATE=1` env var                  | Splash never opens. Main shows immediately. Background hourly check still runs.              |
 
 During runtime, the existing hourly background check + `UpdateBanner` flow is **unchanged** — only the startup check becomes blocking.
 
+UI strings are Russian-only, matching the rest of the renderer (no i18n layer exists in this project, and the existing `UpdateBanner` is Russian-only).
+
 ## 2. Window architecture
 
-A fourth Tauri window `splash` is added in `tauri.conf.json`:
+### 2.1 tauri.conf.json diff
+
+Two changes:
+
+1. **`main` window** flips from `"visible": true` to `"visible": false`. Without this, on Windows the OS briefly shows main before `setup()` runs and hides it (visible flash of 100–300ms). All call sites that should display main now explicitly call `window.show()`: the dev-build setup branch, the env-var skip branch, and the splash-flow terminal step.
+
+2. **New `splash` window** appended to the `windows` array:
+
+   ```json
+   {
+     "label": "splash",
+     "title": "VoiceChat",
+     "width": 380,
+     "height": 200,
+     "decorations": false,
+     "transparent": true,
+     "alwaysOnTop": true,
+     "skipTaskbar": true,
+     "resizable": false,
+     "focus": true,
+     "visible": false,
+     "center": true,
+     "shadow": true
+   }
+   ```
+
+   `transparent: true` works without additional Cargo features here: the existing `notification` and `tray-menu` windows already use `transparent: true` and ship in the current build. No `tauri/windows-transparent` feature flag is needed.
+
+The window is declared `visible: false` so the splash never appears in the dev or skip-env path. Rust calls `window.show()` only when it's about to run the startup flow.
+
+### 2.2 Capabilities diff
+
+`apps/client-tauri/src-tauri/capabilities/default.json` `windows` array gains `"splash"`:
 
 ```json
-{
-  "label": "splash",
-  "title": "VoiceChat",
-  "width": 380,
-  "height": 200,
-  "decorations": false,
-  "transparent": true,
-  "alwaysOnTop": true,
-  "skipTaskbar": true,
-  "resizable": false,
-  "focus": true,
-  "visible": false,
-  "center": true,
-  "shadow": true
-}
+"windows": ["main", "notification", "tray-menu", "splash"]
 ```
 
-The window is declared with `visible: false`. Rust shows it via `window.show()` only when the startup flow begins; this avoids a flash if the dev build skips the flow.
-
-The existing `main` window is briefly hidden during the startup flow (`main.hide()` immediately after `app.setup`, before the splash is shown) and re-shown when the splash closes. This guarantees the splash is the only visible top-level window during the update flow, mirroring Discord's behaviour.
+No new permissions needed — `core:event:default`, `core:window:allow-close`, `core:window:allow-show`, `core:window:allow-set-focus` are already in the list and cover the splash's needs.
 
 ## 3. Renderer integration
 
-`apps/client-tauri/src/entry.ts` already branches on `getCurrentWindow().label`. A new branch is added:
+### 3.1 entry.ts branch
+
+`apps/client-tauri/src/entry.ts` gains a fourth label branch:
 
 ```ts
 } else if (label === 'splash') {
   document.body.classList.remove('bg-bg', 'text-fg');
   document.body.style.background = 'transparent';
+  // Same body::before suppression trick as notification/tray-menu — the
+  // background noise texture would bleed through transparent corners.
+  const s = document.createElement('style');
+  s.textContent = 'body::before { display: none !important; }';
+  document.head.appendChild(s);
   void import('./splash');
 }
 ```
 
-A new file `apps/client-tauri/src/splash.tsx` is created. It is **self-contained**: it does not import from the shared `apps/client/src/renderer` tree. The splash should not pull in livekit, zustand, or any non-trivial dependency — boot time of the splash must be near-instant.
+### 3.2 splash.tsx
 
-The splash component:
+New file `apps/client-tauri/src/splash.tsx`, **self-contained**:
 
-- Mounts its own ReactDOM root into `#root`.
-- Renders a rounded card (`bg-zinc-950`, ring `ring-zinc-800/60`, soft shadow) per the Velvet Onyx theme.
-- Inside the card: VoiceChat logo, current state text, optional thin progress bar (`bg-zinc-800` track, `bg-zinc-200` fill, 2px tall).
-- Subscribes to `update:status` via `@tauri-apps/api/event.listen`.
-- Maps each `UpdateStatus` variant to the strings in the Behaviour table above.
-- On terminal states (`Idle`, `Error` after delay, app restart) the splash invokes the `splash_done` Tauri command, which closes the splash and shows the main window.
+- Mounts its own `ReactDOM.createRoot` into `#root`.
+- Renders a rounded card (`bg-zinc-950`, ring `ring-zinc-800/60`, soft shadow) per Velvet Onyx.
+- Card content: VoiceChat wordmark/logo, status text, thin progress bar (`bg-zinc-800` track, `bg-zinc-200` fill, 2px tall) — bar visible only when `kind === 'downloading'`.
+- **Bundle discipline:** must not import from `apps/client/src/renderer/**`. No livekit, no zustand, no shared components. Only `react`, `react-dom`, `@tauri-apps/api/event`, `@tauri-apps/api/core`. This keeps the splash bundle small and load-time near-instant. (A lint rule or `eslint` import restriction can be added later; for now this is a code-review-time invariant.)
 
-Tailwind/PostCSS already resolve via the existing config — no new pipeline.
+### 3.3 Splash lifecycle (renderer side)
+
+```
+mount
+  ├─ ReactDOM render with initial state = 'connecting'
+  ├─ await listen<UpdateStatus>('update:status', setStatus)    // subscribe FIRST
+  └─ await invoke('splash_ready')                              // tell Rust to begin
+```
+
+The order matters: the listener must be live before `splash_ready` resolves on the Rust side, otherwise the first `Checking` emit can race the subscription. `@tauri-apps/api/event.listen` returns once the listener is registered with the backend, so awaiting it before `invoke('splash_ready')` is sufficient.
+
+Splash never makes lifecycle decisions itself (no self-close, no `splash_done` command). It is a pure status renderer. Rust owns when the splash closes and when main is shown.
 
 ## 4. Rust orchestration
 
-Changes to `apps/client-tauri/src-tauri/src/updater.rs`:
+### 4.1 Function split in `updater.rs`
 
-- The current `schedule(app)` is split into:
-  - `pub async fn run_startup_blocking(app: AppHandle) -> ()` — the new entry point. Does one check + download + install + restart cycle, all status emitted to splash. Returns only on non-update path (Idle, Error, Timeout).
-  - `pub fn schedule_background_checks(app: AppHandle)` — the existing hourly loop, sans the first immediate call. Spawned by `run_startup_blocking` on its non-update return path.
-- The enum `UpdateStatus` gains one variant: `Installing { version: String }`. Emitted between `Ready` and the actual `app.restart()` so the splash can show "Установка…" without progress.
-- Startup-blocking flow uses `tokio::select!` between the updater future and `tokio::time::sleep(Duration::from_secs(20))`. On timeout, emit `Idle` and return.
-- Splash-side terminal handling (Idle / Error) is initiated from JS via a new Tauri command `splash_done` that:
-  - Closes the splash window (`get_webview_window("splash").close()`).
-  - Shows the main window (`get_webview_window("main").show()`).
-  - Focuses main (`main.set_focus()`).
-- Successful install path: `download_and_install` returns, Rust calls `app.restart()` (control flow ends; OS relaunches).
+- `schedule()` is renamed `schedule_background_checks()` and loses its first immediate `check_and_download` call — only the hourly loop remains. (The startup check is now the splash flow's job.)
+- New `pub async fn run_startup_blocking(app: AppHandle)`. Returns `()`. Called from `setup`. Owns the splash window's entire lifetime and the main window's visibility.
+- Existing `check_and_download` and `install_pending` are left untouched — they back the runtime `UpdateBanner` flow and the `update_check` / `update_install` IPC commands.
 
-Changes to `apps/client-tauri/src-tauri/src/lib.rs`:
+### 4.2 `run_startup_blocking` flow
 
-- In `setup`, the `#[cfg(not(debug_assertions))]` block changes from `updater::schedule(app.handle().clone())` to:
-  ```rust
-  if std::env::var("VOICECHAT_SKIP_UPDATE").is_err() {
-      let app_for_main = app.handle().clone();
-      if let Some(main) = app_for_main.get_webview_window("main") {
-          let _ = main.hide();
-      }
-      tauri::async_runtime::spawn(updater::run_startup_blocking(app.handle().clone()));
-  } else {
-      updater::schedule_background_checks(app.handle().clone());
-  }
-  ```
-- The new `splash_done` command is added to `commands.rs` and registered in `invoke_handler!`.
+```
+1. Show splash:  app.get_webview_window("splash")?.show()
+2. Wait for handshake from splash JS, with 5s timeout:
+     tokio::select! {
+       _ = wait_for_splash_ready() => { ok, proceed }
+       _ = sleep(5s)                => { close splash, show main, return }
+     }
+3. emit Checking
+4. tokio::select! {
+     update_result = updater.check()          => handle below
+     _            = sleep(20s)                => emit Idle, close splash 300ms later, show main, return
+   }
+5. If check Err or None:
+     emit Idle, sleep 300ms (splash fade), close splash, show main, return
+6. If check Ok(Some(update)):
+     emit Available { version }
+     emit Downloading { percent: 0 }
+     download_and_install(progress_cb -> emit Downloading { percent })
+     emit Installing { version }
+     app.restart()    // never returns
+7. If download_and_install Err:
+     emit Error { message }, sleep 1.5s, close splash, show main, return
+8. On any return path (non-restart): schedule_background_checks(app.clone())
+```
+
+### 4.3 Handshake mechanism (`splash_ready` command)
+
+New Tauri command in `commands.rs`:
+
+```rust
+#[tauri::command]
+pub async fn splash_ready(state: tauri::State<'_, UpdaterState>) -> Result<(), String> {
+    state.notify_splash_ready().await;
+    Ok(())
+}
+```
+
+`UpdaterState` gains a `tokio::sync::Notify` field. `notify_splash_ready()` calls `notify.notify_one()`. `run_startup_blocking` `await`s `state.splash_ready.notified()` inside the `tokio::select!`.
+
+Multiple calls are safe: extra `notify_one()` calls just wake additional waiters that don't exist. The handshake is one-shot from Rust's perspective; Rust does not re-await it.
+
+### 4.4 Close/show window helper
+
+```rust
+fn close_splash_and_show_main(app: &AppHandle) {
+    if let Some(s) = app.get_webview_window("splash") {
+        let _ = s.close();
+    }
+    if let Some(m) = app.get_webview_window("main") {
+        let _ = m.show();
+        let _ = m.set_focus();
+    }
+}
+```
+
+Idempotent: if splash is already closed, `close()` is a no-op-ish (returns Err which we discard). If main is already shown, `show()` is a no-op. Safe to call from any terminal branch.
+
+### 4.5 `lib.rs` setup diff
+
+The current setup block:
+
+```rust
+#[cfg(not(debug_assertions))]
+updater::schedule(app.handle().clone());
+```
+
+becomes:
+
+```rust
+#[cfg(not(debug_assertions))]
+{
+    if std::env::var("VOICECHAT_SKIP_UPDATE").is_ok() {
+        if let Some(m) = app.handle().get_webview_window("main") {
+            let _ = m.show();
+        }
+        updater::schedule_background_checks(app.handle().clone());
+    } else {
+        let app_handle = app.handle().clone();
+        tauri::async_runtime::spawn(updater::run_startup_blocking(app_handle));
+    }
+}
+
+#[cfg(debug_assertions)]
+{
+    if let Some(m) = app.handle().get_webview_window("main") {
+        let _ = m.show();
+    }
+    // existing devtools open call follows
+}
+```
+
+Both `cfg` branches now explicitly call `main.show()` because `tauri.conf.json` declares `visible: false` for main.
 
 ## 5. Event contract
 
-Existing event `update:status` is reused. New JSON shapes:
+Existing event `update:status` is reused, with one new variant. All emitted shapes:
 
 ```json
 { "kind": "checking" }
-{ "kind": "available", "version": "0.3.1" }
+{ "kind": "available",   "version": "0.3.1" }
 { "kind": "downloading", "percent": 42 }
-{ "kind": "ready", "version": "0.3.1" }
-{ "kind": "installing", "version": "0.3.1" }   // new
+{ "kind": "installing",  "version": "0.3.1" }    // NEW — emitted only by run_startup_blocking, between download finish and app.restart()
+{ "kind": "ready",       "version": "0.3.1" }    // emitted only by check_and_download (background flow)
 { "kind": "idle" }
-{ "kind": "error", "message": "…" }
+{ "kind": "error",       "message": "…" }
 ```
 
-`shared/types.ts` `UpdateStatus` type is **not** extended for Electron — the Tauri splash imports its types locally from `apps/client-tauri/src/splash.tsx`. (Tauri and Electron `UpdateStatus` types already differ in practice; we don't want to leak a Tauri-only variant into Electron.)
+`Ready` is NOT emitted in the startup flow because the startup flow uses `download_and_install` in one shot (no pause between download and install). `Installing` fills the equivalent slot for splash UX. `Ready` continues to drive the runtime `UpdateBanner` "Install now" button via the background flow.
 
-## 6. Capabilities
+The Tauri `UpdateStatus` enum in `updater.rs` gains the `Installing { version: String }` variant. `apps/client/src/renderer/...` (Electron-shared) `UpdateStatus` type is **not** extended — the splash imports its own type locally from `splash.tsx`.
 
-`apps/client-tauri/src-tauri/capabilities/default.json` likely needs the splash window listed in the `windows` array of relevant permissions (event, core:window, etc). The exact diff is to be confirmed during implementation by booting and reading any capability errors logged by Tauri.
+## 6. Failure modes (explicit)
 
-## 7. Failure modes (explicit)
+- **Splash bundle broken (JS throws on load):** `splash_ready` is never invoked. The 5s handshake timeout fires. Rust closes splash, shows main. Updater is skipped for this launch (will run next launch). Logged as warning.
+- **Updater server 404 / network drop on check:** `updater.check()` returns Err. Rust treats as Idle (existing behaviour). Splash shows "Не удалось проверить" 1.5s, closes, main shown.
+- **Check hangs:** 20s `tokio::select!` timeout cuts it. Same as network drop branch.
+- **Download fails mid-stream:** `download_and_install` returns Err. Rust emits `Error`, sleeps 1.5s, closes splash, shows main. Old binary remains usable.
+- **Install step fails (signature mismatch, write error):** Same Error path.
+- **User force-kills splash via Task Manager during download:** Splash window gone. `run_startup_blocking` continues in tokio task. Successful path: `app.restart()` fires, new process starts cleanly with new splash. Failure path: `close_splash_and_show_main` runs — `splash.close()` is no-op (already gone), `main.show()` succeeds. Background loop starts.
+- **App quits via `app.quit()` during download:** Tauri kills the tokio task; partial download remains in plugin's cache. Next launch resumes from cache (plugin behaviour, unchanged).
+- **Multiple instances:** Out of scope. The app currently has no single-instance lock; this design does not add one. If two instances launch simultaneously both will run their own splash + update flow independently.
 
-- **Updater server 404 / network drop on check:** `updater.check()` returns Err. Rust treats this as Idle (already today's behaviour). Splash shows "Не удалось проверить" briefly, then closes.
-- **Check hangs:** 20s `tokio::select!` timeout cuts it. Splash closes.
-- **Download fails mid-stream:** `download_and_install` returns Err. Rust emits `Error`. Splash shows "Ошибка загрузки", waits 1.5s, calls `splash_done`.
-- **Install step fails (signature mismatch, write error):** Same Error path. The old binary is still on disk, app remains usable.
-- **App quits during download:** Tauri kills the tokio task; partial download remains in the plugin's cache. Next launch resumes from cache (plugin behaviour, unchanged).
-- **Multiple instances:** Out of scope. The app does not currently have a single-instance lock; this design does not introduce one.
+The 20s timeout is intentionally on the **check** only, not the whole flow. A slow large download will continue past 20s; the splash will keep showing progress. This matches Discord: a slow download is still progress, and the user prefers waiting over launching on the old version when an update is already partly down.
 
-## 8. What is NOT changing
+## 7. What is NOT changing
 
 - Electron client (`apps/client/`) is untouched.
 - Existing `UpdateBanner` and hourly background check stay exactly as today.
 - `quitAndInstall` / `update_install` IPC paths stay (used by the banner).
 - No new persisted preferences; the flow is not user-configurable.
+- No single-instance enforcement.
 
-## 9. Test plan (manual)
+## 8. Test plan (manual)
 
-1. **Happy path, no update:** Bump `tauri.conf.json` version higher than the published one, build, run. Splash should flash briefly, main window opens within ~1s of splash close.
-2. **Happy path, update available:** Publish a higher version to GitHub Releases (or stub the endpoint locally). Run with older bundled version. Splash should show progress, then "Установка…", then app restarts on new version.
-3. **Offline:** Disable network, run. Splash should show "Не удалось проверить" and close; main opens with old version.
-4. **Server hangs:** Point `updater.endpoints` at a sinkhole URL. After 20s, splash closes; main opens.
-5. **Dev build:** `npm run dev` — splash must not appear.
-6. **Skip env:** `VOICECHAT_SKIP_UPDATE=1` release build — splash must not appear; background check still runs hourly.
+1. **Happy path, no update:** Bump `tauri.conf.json` version higher than the published one, build, run. Splash flashes briefly with "Обновлений нет", main opens.
+2. **Happy path, update available:** Publish a higher version to GitHub Releases (or stub the endpoint). Run with older bundled version. Splash shows progress, then "Установка…", then app restarts on new version.
+3. **Offline:** Disable network, run. Splash shows "Не удалось проверить" 1.5s, closes; main opens with old version.
+4. **Server hangs:** Point `updater.endpoints` at a sinkhole URL. After 20s, splash transitions, closes; main opens.
+5. **Splash bundle broken:** Temporarily throw at top of `splash.tsx`. After 5s, main opens.
+6. **Dev build:** `npm run dev` — splash must not appear, main opens immediately.
+7. **Skip env:** `VOICECHAT_SKIP_UPDATE=1` release build — splash must not appear; background check still runs hourly (verify via log).
+8. **Force kill splash:** Mid-download, kill splash via Task Manager. Main should appear after update completes (success) or after error timeout (failure).
 
-## 10. Open questions
+## 9. Files touched
 
-None blocking. Capabilities diff (§6) is to be confirmed during implementation rather than guessed upfront.
+- `apps/client-tauri/src-tauri/tauri.conf.json` — `main.visible` flip + new `splash` window.
+- `apps/client-tauri/src-tauri/capabilities/default.json` — add `"splash"` to `windows`.
+- `apps/client-tauri/src-tauri/src/updater.rs` — rename `schedule`, add `run_startup_blocking`, add `Installing` variant, add Notify field to `UpdaterState`.
+- `apps/client-tauri/src-tauri/src/commands.rs` — add `splash_ready` command.
+- `apps/client-tauri/src-tauri/src/lib.rs` — register `splash_ready`, replace setup updater block, add explicit `main.show()` calls.
+- `apps/client-tauri/src/entry.ts` — add `label === 'splash'` branch.
+- `apps/client-tauri/src/splash.tsx` — new, ~120 lines.
