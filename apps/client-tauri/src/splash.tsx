@@ -52,7 +52,10 @@ function statusText(status: UpdateStatus): { primary: string; secondary?: string
     case 'idle':
       return { primary: 'Обновлений нет' };
     case 'error':
-      return { primary: 'Не удалось проверить', secondary: 'Продолжаем со старой версией' };
+      return {
+        primary: 'Не удалось обновить',
+        secondary: status.message,
+      };
   }
 }
 
@@ -92,7 +95,8 @@ function Splash() {
   const indeterminate =
     status.kind === 'checking' ||
     status.kind === 'available' ||
-    status.kind === 'installing';
+    status.kind === 'installing' ||
+    (status.kind === 'downloading' && status.percent === 0);
 
   return (
     <div

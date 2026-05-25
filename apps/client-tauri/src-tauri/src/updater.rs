@@ -41,14 +41,14 @@ const STATUS_EVENT: &str = "update:status";
 /// Максимум, сколько ждём, пока splash.tsx подпишется на update:status и
 /// дёрнет splash_ready. Если за это время handshake не пришёл — считаем, что
 /// splash-бандл сломан, закрываем его и пускаем юзера в main без апдейта.
-const SPLASH_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
+const SPLASH_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(12);
 /// Бюджет на сам updater.check(). Сетевая дыра / висящий endpoint не должны
 /// удерживать юзера на splash больше этого времени. На сам download таймаута
 /// нет — большой пакет на медленном инете — это всё ещё прогресс.
-const CHECK_TIMEOUT: Duration = Duration::from_secs(20);
+const CHECK_TIMEOUT: Duration = Duration::from_secs(45);
 /// Сколько держим splash после "обновлений нет", чтобы юзер успел заметить
 /// фейд-аут и не казалось, что окно дёрнулось.
-const NO_UPDATE_HOLD: Duration = Duration::from_millis(300);
+const NO_UPDATE_HOLD: Duration = Duration::from_millis(900);
 /// Сколько держим splash после ошибки (сеть/таймаут/download/install fail) —
 /// чтобы юзер прочитал сообщение, прежде чем main всплывёт.
 const ERROR_HOLD: Duration = Duration::from_millis(1500);
@@ -78,26 +78,19 @@ enum UpdateStatus {
 pub struct UpdaterState {
     pub last_ready_version: tokio::sync::Mutex<Option<String>>,
     pub splash_ready: Notify,
-    /// Момент splash.show() — для минимального времени на экране (dev / VOICECHAT_SPLASH_HOLD_SEC).
+    /// Момент splash.show() — для опционального VOICECHAT_SPLASH_HOLD_SEC.
     pub splash_shown_at: tokio::sync::Mutex<Option<Instant>>,
 }
 
 /// Минимум, сколько splash остаётся видимым перед закрытием.
-/// VOICECHAT_SPLASH_HOLD_SEC перебивает всё; в debug по умолчанию 40 с для разглядывания UI.
+/// VOICECHAT_SPLASH_HOLD_SEC — опциональный override (секунды), по умолчанию 0.
 fn min_splash_visible() -> Duration {
     if let Ok(raw) = std::env::var("VOICECHAT_SPLASH_HOLD_SEC") {
         if let Ok(secs) = raw.parse::<u64>() {
             return Duration::from_secs(secs);
         }
     }
-    #[cfg(debug_assertions)]
-    {
-        return Duration::from_secs(40);
-    }
-    #[cfg(not(debug_assertions))]
-    {
-        Duration::ZERO
-    }
+    Duration::ZERO
 }
 
 async fn hold_splash_before_close(app: &AppHandle, status_hold: Duration) {
@@ -123,6 +116,20 @@ async fn finish_splash(app: &AppHandle, status_hold: Duration) {
 fn emit(app: &AppHandle, status: UpdateStatus) {
     if let Err(err) = app.emit(STATUS_EVENT, &status) {
         log::warn!("[updater] не удалось эмитить статус: {err}");
+    }
+}
+
+/// Startup splash слушает только своё окно — app.emit() иногда теряется,
+/// если main WebView ещё грузит тяжёлый renderer.
+fn emit_splash(app: &AppHandle, status: UpdateStatus) {
+    let fallback = status.clone();
+    if let Some(splash) = app.get_webview_window("splash") {
+        if let Err(err) = splash.emit(STATUS_EVENT, status) {
+            log::warn!("[updater] splash emit failed: {err}");
+            emit(app, fallback);
+        }
+    } else {
+        emit(app, status);
     }
 }
 
@@ -282,22 +289,24 @@ pub async fn run_startup_blocking(app: AppHandle) {
     .await;
     if handshake.is_err() {
         log::warn!(
-            "[updater] splash handshake timeout ({}s) — splash bundle сломан?",
+            "[updater] splash handshake timeout ({}s) — продолжаем check (JS мог загрузиться с задержкой)",
             SPLASH_HANDSHAKE_TIMEOUT.as_secs()
         );
-        finish_splash(&app, Duration::ZERO).await;
-        schedule_background_checks(app.clone());
-        return;
+        // Даём splash.tsx ещё немного времени повесить listener, если bundle
+        // грузился медленно (холодный старт WebView2 / антивирус).
+        tokio::time::sleep(Duration::from_millis(400)).await;
     }
 
-    // 3) Checking. С этой точки splash гарантированно получает события.
-    emit(&app, UpdateStatus::Checking);
+    // 3) Checking. После handshake (или grace после timeout) эмитим статус.
+    let current_version = app.package_info().version.to_string();
+    log::info!("[updater] startup check, текущая версия {current_version}");
+    emit_splash(&app, UpdateStatus::Checking);
 
     let updater = match app.updater() {
         Ok(u) => u,
         Err(e) => {
             log::info!("[updater] недоступен на старте: {e}");
-            emit(&app, UpdateStatus::Error { message: e.to_string() });
+            emit_splash(&app, UpdateStatus::Error { message: e.to_string() });
             finish_splash(&app, ERROR_HOLD).await;
             schedule_background_checks(app.clone());
             return;
@@ -313,16 +322,27 @@ pub async fn run_startup_blocking(app: AppHandle) {
     let maybe_update = match check_result {
         Err(_) => {
             log::info!("[updater] check timeout {}s — fallback", CHECK_TIMEOUT.as_secs());
-            emit(&app, UpdateStatus::Error {
-                message: format!("timeout {}s", CHECK_TIMEOUT.as_secs()),
-            });
+            emit_splash(
+                &app,
+                UpdateStatus::Error {
+                    message: format!(
+                        "Проверка обновлений заняла больше {} с. Запускаем текущую версию {current_version}.",
+                        CHECK_TIMEOUT.as_secs()
+                    ),
+                },
+            );
             finish_splash(&app, ERROR_HOLD).await;
             schedule_background_checks(app.clone());
             return;
         }
         Ok(Err(e)) => {
             log::info!("[updater] check failed на старте: {e}");
-            emit(&app, UpdateStatus::Error { message: e.to_string() });
+            emit_splash(
+                &app,
+                UpdateStatus::Error {
+                    message: format!("{e} (версия {current_version})"),
+                },
+            );
             finish_splash(&app, ERROR_HOLD).await;
             schedule_background_checks(app.clone());
             return;
@@ -331,7 +351,8 @@ pub async fn run_startup_blocking(app: AppHandle) {
     };
 
     let Some(update) = maybe_update else {
-        emit(&app, UpdateStatus::Idle);
+        log::info!("[updater] обновлений нет (версия {current_version})");
+        emit_splash(&app, UpdateStatus::Idle);
         finish_splash(&app, NO_UPDATE_HOLD).await;
         schedule_background_checks(app.clone());
         return;
@@ -339,7 +360,15 @@ pub async fn run_startup_blocking(app: AppHandle) {
 
     // 5) Update найден — качаем + ставим одним проходом, потом restart.
     let version = update.version.clone();
-    emit(&app, UpdateStatus::Available { version: version.clone() });
+    log::info!("[updater] доступно обновление {current_version} → {version}");
+    emit_splash(
+        &app,
+        UpdateStatus::Available {
+            version: version.clone(),
+        },
+    );
+    // Пусть splash отрисует «Найдено обновление» до тяжёлого download.
+    tokio::time::sleep(Duration::from_millis(120)).await;
 
     let downloaded = Arc::new(AtomicU64::new(0));
     let total = Arc::new(AtomicU64::new(0));
@@ -369,15 +398,14 @@ pub async fn run_startup_blocking(app: AppHandle) {
                 } else {
                     0
                 };
-                emit(&app_for_download, UpdateStatus::Downloading { percent });
+                emit_splash(&app_for_download, UpdateStatus::Downloading { percent });
             },
             move || {
-                // download закончен — переключаем splash на "Установка…".
-                // Сам install (распаковка / запись бинаря) у tauri-plugin-updater
-                // не имеет прогресса, отсюда статус без percent.
-                emit(
+                emit_splash(
                     &app_for_finish,
-                    UpdateStatus::Installing { version: version_for_finish.clone() },
+                    UpdateStatus::Installing {
+                        version: version_for_finish.clone(),
+                    },
                 );
             },
         )
@@ -385,14 +413,16 @@ pub async fn run_startup_blocking(app: AppHandle) {
 
     match install_result {
         Ok(()) => {
-            // restart возвращает `!` — control flow обрывается, новый процесс
-            // стартует с нуля и снова пройдёт через run_startup_blocking
-            // (где check вернёт None, splash моргнёт и закроется).
             app.restart();
         }
         Err(e) => {
             log::warn!("[updater] download_and_install failed: {e}");
-            emit(&app, UpdateStatus::Error { message: e.to_string() });
+            emit_splash(
+                &app,
+                UpdateStatus::Error {
+                    message: format!("Не удалось установить {version}: {e}"),
+                },
+            );
             finish_splash(&app, ERROR_HOLD).await;
             schedule_background_checks(app);
         }

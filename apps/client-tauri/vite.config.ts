@@ -51,7 +51,12 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
-      rollupOptions: { input: resolve(__dirname, 'index.html') },
+      rollupOptions: {
+        input: {
+          main: resolve(__dirname, 'index.html'),
+          splash: resolve(__dirname, 'splash.html'),
+        },
+      },
     },
   };
 });
