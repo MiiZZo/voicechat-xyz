@@ -10,20 +10,19 @@ jobs:
   build:
     permissions:
       contents: write
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
-            args: --target aarch64-apple-darwin
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
-          - platform: ubuntu-22.04
-            args: ''
-          - platform: windows-latest
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
+          # Native x64 on windows-latest.
+          - label: x64
+            rust_target: x86_64-pc-windows-msvc
+            tauri_args: ''
+          # Cross-compile ARM64 (Windows on ARM / Snapdragon PCs).
+          - label: arm64
+            rust_target: aarch64-pc-windows-msvc
+            tauri_args: '--target aarch64-pc-windows-msvc'
 
     steps:
       - uses: actions/checkout@v4
@@ -36,18 +35,12 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.rust_target }}
 
       - name: cache cargo
         uses: swatinem/rust-cache@v2
         with:
           workspaces: apps/client-tauri/src-tauri -> target
-
-      - name: install linux deps
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: install frontend deps
         working-directory: apps/client-tauri
@@ -67,7 +60,7 @@ jobs:
           echo "--- .env.local-server ---"
           cat .env.local-server
 
-      - name: build & publish
+      - name: build & publish (${{ matrix.label }})
         uses: tauri-apps/tauri-action@v0.5.23
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -77,15 +70,15 @@ jobs:
           projectPath: apps/client-tauri
           tagName: ${{ github.ref_name }}
           releaseName: 'VoiceChat (Tauri) v__VERSION__'
-          releaseBody: 'Автосборка Tauri-клиента. См. ассеты для установки.'
-          # Публикуем сразу — draft/pre-release ломали «Latest» и давали split-release.
+          releaseBody: 'Автосборка Tauri-клиента (Windows x64 + ARM64). См. ассеты для установки.'
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
-          args: ${{ matrix.args }}
+          args: ${{ matrix.tauri_args }}
 
       - name: assert lobby URL is baked into bundle
+        if: matrix.label == 'x64'
         shell: bash
         working-directory: apps/client-tauri
         env:
@@ -106,7 +99,6 @@ jobs:
           fi
           echo "OK: $EXPECTED_URL is baked into bundle"
 
-  # После всех matrix-джобов: один release, latest.json с URL на правильный tag.
   finalize:
     needs: build
     runs-on: ubuntu-latest
