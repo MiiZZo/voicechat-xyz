@@ -332,3 +332,54 @@
     flex-shrink: 0;
   }
 }
+
+/* === Velvet Onyx power-save ===
+   Замеры (perf-diag.ts) показали: Tauri 2 + WebView2 на Windows не тротлят
+   rendering ни при потере фокуса, ни при window.hide() в трей. visibilityState
+   остаётся 'visible', raf и CSS-анимации идут на полной частоте монитора
+   (120Hz = 120 кадров/сек GPU+CPU работы в никуда).
+
+   Workaround: lib/window-power-save.ts вешает на body класс по фокусу окна
+   и явному visibility-сигналу из Rust. Здесь — правила, обнуляющие тяжёлые
+   always-on эффекты.
+
+   .vo-bg     — окно потеряло фокус, но физически видимо (alt-tab в игру).
+                Гасим только то, что не видно и не нужно: halo, backdrop на
+                мелких чипах, speaking-pulse. Контент держим — юзер может
+                посматривать на окно периферийно (мульти-монитор).
+   .vo-hidden — окно реально hide()'нуто в трей. Юзер физически не видит
+                ничего → дополнительно: 1) глобально паузим все CSS-анимации
+                через animation-play-state, 2) отключаем transitions,
+                3) гасим backdrop-filter и на ChatPanel.
+
+   Правила вне @layer — чтобы перебивать @layer components (где определены
+   .vo-chip, .vo-chat-bg, .vo-tile-mic, .vo-speaking::after) без !important. */
+body.vo-bg::before,
+body.vo-bg .vo-halo-2,
+body.vo-hidden::before,
+body.vo-hidden .vo-halo-2 { display: none; }
+
+body.vo-bg .vo-chip,
+body.vo-bg .vo-tile-mic,
+body.vo-hidden .vo-chip,
+body.vo-hidden .vo-tile-mic,
+body.vo-hidden .vo-chat-bg {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  /* Solid translucent на месте blurred glass — визуально близко на тёмном
+     фоне, без shader-cost для compositor'а. */
+  background-color: hsla(240, 10%, 4%, 0.7);
+}
+
+body.vo-bg .vo-speaking::after,
+body.vo-hidden .vo-speaking::after { animation: none; }
+
+/* Глобальный killswitch для анимаций — только в hidden. !important нужен,
+   чтобы перебить animation: ... infinite на конкретных селекторах
+   (orbit-light-1, light-breath-1/2, vo-speaking-pulse, vo-modal-anim и др.) */
+body.vo-hidden *,
+body.vo-hidden *::before,
+body.vo-hidden *::after {
+  animation-play-state: paused !important;
+  transition: none !important;
+}

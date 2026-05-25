@@ -109,9 +109,23 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
 
 fn show_main_window(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
+        // Парный SetIsVisible(true) к hide-time'овскому SetIsVisible(false)
+        // из lib.rs CloseRequested. Делаем ДО win.show(), чтобы Chromium успел
+        // "проснуться" к моменту, когда окно появится на экране — иначе будет
+        // видна пустая/устаревшая отрисовка первые несколько кадров.
+        #[cfg(target_os = "windows")]
+        {
+            let _ = win.with_webview(|webview| unsafe {
+                let _ = webview.controller().SetIsVisible(true.into());
+            });
+        }
         let _ = win.unminimize();
         let _ = win.show();
         let _ = win.set_focus();
+        // Парный сигнал к window:visibility=false из lib.rs CloseRequested:
+        // снимает класс vo-hidden, эффекты возвращаются (vo-bg снимется
+        // отдельно через DOM window.focus после set_focus()).
+        let _ = app.emit("window:visibility", true);
     }
 }
 

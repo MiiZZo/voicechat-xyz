@@ -48,6 +48,15 @@ pub async fn update_install(app: AppHandle) -> Result<(), String> {
     updater::install_pending(app).await
 }
 
+/// Handshake от splash.tsx: подписка на update:status уже сделана, можно
+/// эмитить статусы. Снимает race condition между Rust'овым Checking и
+/// JS-listener'ом. См. updater::UpdaterState::splash_ready.
+#[tauri::command]
+pub async fn splash_ready(state: tauri::State<'_, updater::UpdaterState>) -> Result<(), String> {
+    state.splash_ready.notify_one();
+    Ok(())
+}
+
 // === file download ===========================================================
 
 #[derive(Deserialize)]

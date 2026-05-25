@@ -51,6 +51,7 @@ pub fn run() {
             commands::screen_share_respond,
             commands::update_check,
             commands::update_install,
+            commands::splash_ready,
             commands::file_download,
             commands::open_external,
             commands::set_tray_mic_muted,
@@ -69,36 +70,73 @@ pub fn run() {
                     }
                 }
             }
-            // В dev-сборке updater не нужен и только спамит ошибки в лог
-            // (latest-tauri.json пока не опубликован). Запускаем только в release.
-            #[cfg(not(debug_assertions))]
-            updater::schedule(app.handle().clone());
-            // В dev-сборке сразу открываем DevTools — нужно для разбора WebRTC-stats.
-            #[cfg(debug_assertions)]
-            if let Some(win) = app.get_webview_window("main") {
-                win.open_devtools();
+            // tauri.conf.json теперь declarative прячет main (visible: false) —
+            // без этого Windows успевает показать пустое окно за 100-300 мс
+            // до того, как run_startup_blocking спрячет его императивно. Поэтому
+            // каждая ветка, в которой apдейтер пропускается, обязана явно
+            // показать main.
+            if std::env::var("VOICECHAT_SKIP_UPDATE").is_ok() {
+                // Kill-switch: пропускаем splash + startup-check полностью,
+                // оставляем только часовой banner-flow. Работает и в dev, и в release.
+                log::info!("[updater] VOICECHAT_SKIP_UPDATE set — пропускаем startup flow");
+                if let Some(m) = app.handle().get_webview_window("main") {
+                    let _ = m.show();
+                    #[cfg(debug_assertions)]
+                    {
+                        let _ = m.open_devtools();
+                    }
+                }
+                updater::schedule_background_checks(app.handle().clone());
+            } else {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(updater::run_startup_blocking(handle));
             }
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                let app = window.app_handle();
-                let state = app.state::<AppState>();
-                let quitting = state.quitting.load(Ordering::SeqCst);
-                if quitting {
-                    return; // нормальный выход — не вмешиваемся
-                }
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    let app = window.app_handle();
+                    let state = app.state::<AppState>();
+                    let quitting = state.quitting.load(Ordering::SeqCst);
+                    if quitting {
+                        return; // нормальный выход — не вмешиваемся
+                    }
 
-                // Читаем prefs.closeToTray. Если ошибка — fallback на нормальное закрытие.
-                let close_to_tray = prefs::get_prefs(app)
-                    .ok()
-                    .and_then(|v| v.get("closeToTray").and_then(|b| b.as_bool()))
-                    .unwrap_or(true);
+                    // Читаем prefs.closeToTray. Если ошибка — fallback на нормальное закрытие.
+                    let close_to_tray = prefs::get_prefs(app)
+                        .ok()
+                        .and_then(|v| v.get("closeToTray").and_then(|b| b.as_bool()))
+                        .unwrap_or(true);
 
-                if close_to_tray {
-                    api.prevent_close();
-                    let _ = window.hide();
+                    if close_to_tray {
+                        // Источник истины для window-power-save.ts: WebView2 на
+                        // Windows не пробрасывает visibility-change при hide(),
+                        // поэтому говорим фронту явно. Эмитим ДО hide() — frontend
+                        // успеет применить vo-hidden класс.
+                        let _ = app.emit("window:visibility", false);
+                        // Ключевой фикс: дергаем нативный WebView2 API, чтобы
+                        // Chromium внутри затротлил rAF/setInterval/CSS-анимации
+                        // как обычный hidden tab. window.hide() этого НЕ делает
+                        // (не пробрасывает visibility-change в WebView2 controller),
+                        // отсюда наш баг с 120Hz composition в скрытом окне.
+                        // Audio/WebRTC продолжают работать — Chromium это media
+                        // не паузит.
+                        // on_window_event даёт &Window, а with_webview есть только
+                        // на WebviewWindow — поднимаемся через app по label'у.
+                        #[cfg(target_os = "windows")]
+                        {
+                            if let Some(wv) = app.get_webview_window(window.label()) {
+                                let _ = wv.with_webview(|webview| unsafe {
+                                    let _ = webview.controller().SetIsVisible(false.into());
+                                });
+                            }
+                        }
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
                 }
+                _ => {}
             }
         })
         .run(tauri::generate_context!())

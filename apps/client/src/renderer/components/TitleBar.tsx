@@ -47,6 +47,18 @@ export function TitleBar({ children, className }: Props) {
     >
       <div className="flex min-w-0 flex-1 items-center gap-3 px-3">{children}</div>
 
+      {/* DEV-маркер: показывается только в Vite dev-сборке. Янтарный пилл с
+          моноширинным текстом — заметен, но не разрушает Velvet Onyx палитру
+          (один акцентный цвет на узком badge — норма). pointer-events:none,
+          чтобы не перехватывать drag region у titlebar'а. */}
+      {import.meta.env.DEV && (
+        <div className="flex items-center pr-2 pointer-events-none">
+          <span className="rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold tracking-[0.12em] text-amber-300">
+            DEV
+          </span>
+        </div>
+      )}
+
       <div className="flex items-stretch" style={noDragStyle}>
         <CtrlButton
           label="Свернуть"

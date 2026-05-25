@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Permissions для окон VoiceChat (Tauri): main + notification overlay.",
-  "windows": ["main", "notification", "tray-menu"],
+  "windows": ["main", "notification", "tray-menu", "splash"],
   "permissions": [
     "core:default",
     "core:window:allow-minimize",
