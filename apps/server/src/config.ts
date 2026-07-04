@@ -8,7 +8,11 @@ const ConfigSchema = z.object({
   ROOMS_FILE: z.string().default('./rooms.yaml'),
   LOG_LEVEL: z.string().default('info'),
   UPLOAD_DIR: z.string().default('./uploads'),
-  UPLOAD_TTL_HOURS: z.coerce.number().default(24),
+  // Bumped 24 → 168 so uploaded files outlive as long as the 7-day chat
+  // history that references them (otherwise file messages become dead links).
+  UPLOAD_TTL_HOURS: z.coerce.number().default(168),
+  HISTORY_DIR: z.string().default('./history'),
+  HISTORY_TTL_DAYS: z.coerce.number().default(7),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

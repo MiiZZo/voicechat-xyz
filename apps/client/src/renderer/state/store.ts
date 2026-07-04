@@ -53,6 +53,10 @@ type Store = {
   enterRoom(payload: { roomId: string; roomName: string; join: JoinResponse }): void;
   leaveRoom(): void;
   pushChat(m: ChatMessage): void;
+  /** Seed the list with loaded history, merged with any messages already
+   *  present (live messages that arrived during the fetch win over history),
+   *  deduped by id and sorted by timestamp. */
+  seedHistory(msgs: ChatMessage[]): void;
   /** Patch a chat message in-place (used for upload progress / completion). */
   patchChat(id: string, patch: Partial<FileMessage>): void;
   setMicMutedByUser(muted: boolean): void;
@@ -75,7 +79,17 @@ export const useStore = create<Store>((set) => ({
   // Leaving a room is also a session boundary — un-mute on next join unless
   // initial-device-state says otherwise (useLiveKitRoom owns that).
   leaveRoom: () => set({ view: 'lobby', activeRoom: null, chat: [], micMutedByUser: false }),
-  pushChat: (m) => set((s) => ({ chat: [...s.chat, m] })),
+  // Dedup by id: a message can arrive both from loaded history and live p2p
+  // (or be echoed) — the id is stable across sender/receiver/history.
+  pushChat: (m) => set((s) => (s.chat.some((x) => x.id === m.id) ? s : { chat: [...s.chat, m] })),
+  seedHistory: (msgs) =>
+    set((s) => {
+      const byId = new Map<string, ChatMessage>();
+      for (const m of msgs) byId.set(m.id, m);
+      for (const m of s.chat) byId.set(m.id, m); // live/existing wins over history
+      const merged = [...byId.values()].sort((a, b) => a.timestamp - b.timestamp);
+      return { chat: merged };
+    }),
   patchChat: (id, patch) =>
     set((s) => ({
       chat: s.chat.map((m) =>

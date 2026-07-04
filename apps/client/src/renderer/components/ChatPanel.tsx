@@ -16,20 +16,53 @@ import { cn } from '../lib/cn.js';
 import { uploadFile } from '../lib/upload.js';
 import { notifyChatMessage } from '../lib/notifications.js';
 import { AudioBubble, isAudioMessage } from './AudioBubble.js';
+import { fetchHistory, postHistory, type HistoryRecord } from '../lib/history.js';
 
 const MAX_BYTES = 50 * 1024 * 1024;
 
 type WirePayload =
-  | { type: 'chat'; text: string; timestamp: number }
+  | { type: 'chat'; id: string; text: string; timestamp: number }
   | {
       type: 'file';
       id: string;
+      fileId: string;
       url: string;
       name: string;
       size: number;
       mime: string;
       timestamp: number;
     };
+
+/** Convert a persisted history record into a renderable chat message. Returns
+ *  null for records with an unknown kind (forward-compat). */
+function recordToMessage(r: HistoryRecord): ChatMessage | null {
+  if (r.kind === 'text') {
+    return {
+      kind: 'text',
+      id: r.id,
+      fromIdentity: r.fromIdentity,
+      fromName: r.fromName,
+      text: r.text ?? '',
+      timestamp: r.timestamp,
+    };
+  }
+  if (r.kind === 'file') {
+    return {
+      kind: 'file',
+      id: r.id,
+      fromIdentity: r.fromIdentity,
+      fromName: r.fromName,
+      timestamp: r.timestamp,
+      fileId: r.fileId ?? '',
+      url: r.url ?? '',
+      name: r.name ?? '',
+      size: r.size ?? 0,
+      mime: r.mime ?? 'application/octet-stream',
+      status: 'done',
+    };
+  }
+  return null;
+}
 
 const URL_RE = /(https?:\/\/[^\s]+)/g;
 
@@ -65,7 +98,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function ChatPanel({ room }: { room: Room }) {
-  const { chat, pushChat, patchChat, activeRoom } = useStore();
+  const { chat, pushChat, patchChat, seedHistory, activeRoom } = useStore();
   const [text, setText] = useState('');
   const [isDragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
@@ -84,7 +117,8 @@ export function ChatPanel({ room }: { room: Room }) {
         if (msg.type === 'chat') {
           pushChat({
             kind: 'text',
-            id: `${fromIdentity}-${msg.timestamp}-${Math.random()}`,
+            // Stable message id shared across sender/receiver/history for dedup.
+            id: msg.id ?? `${fromIdentity}-${msg.timestamp}-${Math.random()}`,
             fromIdentity,
             fromName,
             text: msg.text,
@@ -96,11 +130,11 @@ export function ChatPanel({ room }: { room: Room }) {
         } else if (msg.type === 'file') {
           pushChat({
             kind: 'file',
-            id: `${fromIdentity}-${msg.timestamp}-${msg.id}`,
+            id: msg.id ?? `${fromIdentity}-${msg.timestamp}-${msg.fileId}`,
             fromIdentity,
             fromName,
             timestamp: msg.timestamp,
-            fileId: msg.id,
+            fileId: msg.fileId,
             url: msg.url,
             name: msg.name,
             size: msg.size,
@@ -123,21 +157,65 @@ export function ChatPanel({ room }: { room: Room }) {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [chat.length, chat]);
 
+  // Load persisted room history on entering a room. Best-effort: a failure
+  // leaves the chat empty rather than blocking. seedHistory merges with any
+  // live messages that arrived during the fetch.
+  const roomId = activeRoom?.roomId;
+  const roomToken = activeRoom?.join.token;
+  useEffect(() => {
+    if (!roomId || !roomToken) return;
+    let cancelled = false;
+    fetchHistory(roomId, roomToken)
+      .then((records) => {
+        if (cancelled) return;
+        const msgs = records
+          .map(recordToMessage)
+          .filter((m): m is ChatMessage => m !== null);
+        seedHistory(msgs);
+      })
+      .catch(() => {
+        /* history is best-effort */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, roomToken, seedHistory]);
+
+  // Real display name for the history record. Local live display shows "ты"
+  // regardless (MessageRow), but history is shared, so store the actual name —
+  // never the literal "Я".
+  const myName = () =>
+    room.localParticipant.name ?? room.localParticipant.identity.split('#')[0] ?? '?';
+
   const sendText = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed) return;
-    const payload: WirePayload = { type: 'chat', text: trimmed, timestamp: Date.now() };
+    const id = crypto.randomUUID();
+    const timestamp = Date.now();
+    const payload: WirePayload = { type: 'chat', id, text: trimmed, timestamp };
     const bytes = new TextEncoder().encode(JSON.stringify(payload));
     await room.localParticipant.publishData(bytes, { reliable: true });
     pushChat({
       kind: 'text',
-      id: `local-${payload.timestamp}-${Math.random()}`,
+      id,
       fromIdentity: room.localParticipant.identity,
-      fromName: room.localParticipant.name ?? 'Я',
+      fromName: myName(),
       text: trimmed,
-      timestamp: payload.timestamp,
+      timestamp,
     });
+    if (activeRoom) {
+      void postHistory(activeRoom.roomId, activeRoom.join.token, {
+        id,
+        kind: 'text',
+        fromIdentity: room.localParticipant.identity,
+        fromName: myName(),
+        timestamp,
+        text: trimmed,
+      }).catch(() => {
+        /* history is best-effort */
+      });
+    }
     setText('');
   };
 
@@ -152,12 +230,14 @@ export function ChatPanel({ room }: { room: Room }) {
       return;
     }
     const timestamp = Date.now();
-    const localId = `local-${timestamp}-${Math.random()}`;
+    // Message id (stable, used for dedup + history), distinct from the file's
+    // server id which is only known after upload completes.
+    const msgId = crypto.randomUUID();
     pushChat({
       kind: 'file',
-      id: localId,
+      id: msgId,
       fromIdentity: room.localParticipant.identity,
-      fromName: room.localParticipant.name ?? 'Я',
+      fromName: myName(),
       timestamp,
       fileId: '',
       url: '',
@@ -173,10 +253,10 @@ export function ChatPanel({ room }: { room: Room }) {
         roomId: activeRoom.roomId,
         token: activeRoom.join.token,
         file,
-        onProgress: (frac) => patchChat(localId, { progress: frac }),
+        onProgress: (frac) => patchChat(msgId, { progress: frac }),
       });
       const resp = await handle.promise;
-      patchChat(localId, {
+      patchChat(msgId, {
         status: 'done',
         progress: 1,
         fileId: resp.id,
@@ -187,7 +267,8 @@ export function ChatPanel({ room }: { room: Room }) {
       });
       const payload: WirePayload = {
         type: 'file',
-        id: resp.id,
+        id: msgId,
+        fileId: resp.id,
         url: resp.url,
         name: resp.name,
         size: resp.size,
@@ -196,9 +277,23 @@ export function ChatPanel({ room }: { room: Room }) {
       };
       const bytes = new TextEncoder().encode(JSON.stringify(payload));
       await room.localParticipant.publishData(bytes, { reliable: true });
+      void postHistory(activeRoom.roomId, activeRoom.join.token, {
+        id: msgId,
+        kind: 'file',
+        fromIdentity: room.localParticipant.identity,
+        fromName: myName(),
+        timestamp,
+        fileId: resp.id,
+        url: resp.url,
+        name: resp.name,
+        size: resp.size,
+        mime: resp.mime,
+      }).catch(() => {
+        /* history is best-effort */
+      });
     } catch (err) {
       const message = (err as Error).message ?? 'Ошибка загрузки';
-      patchChat(localId, { status: 'error', errorReason: message });
+      patchChat(msgId, { status: 'error', errorReason: message });
       pushToast('error', message);
     }
   };

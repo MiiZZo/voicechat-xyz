@@ -9,6 +9,8 @@ import { TokenIssuer } from './token-issuer.js';
 import { registerRoutes } from './routes.js';
 import { FileStore } from './files/file-store.js';
 import { registerFileRoutes } from './files/routes.js';
+import { HistoryStore } from './history/history-store.js';
+import { registerHistoryRoutes } from './history/routes.js';
 
 const config = loadConfig();
 const rooms = new RoomsRegistry(config.ROOMS_FILE);
@@ -18,6 +20,10 @@ const livekit = new LiveKitClient(config);
 const tokens = TokenIssuer.fromConfig(config);
 const fileStore = new FileStore(config.UPLOAD_DIR);
 const stopCleanup = fileStore.startCleanup(config.UPLOAD_TTL_HOURS * 60 * 60 * 1000);
+const historyStore = new HistoryStore(config.HISTORY_DIR);
+const stopHistoryCleanup = historyStore.startCleanup(
+  config.HISTORY_TTL_DAYS * 24 * 60 * 60 * 1000,
+);
 
 const app = Fastify({ logger, bodyLimit: 60 * 1024 * 1024 });
 await app.register(cors, { origin: true });
@@ -26,9 +32,11 @@ await app.register(multipart, {
 });
 await registerRoutes(app, { config, rooms, livekit, tokens });
 registerFileRoutes(app, { config, store: fileStore });
+registerHistoryRoutes(app, { config, store: historyStore });
 
 const shutdown = async () => {
   stopCleanup();
+  stopHistoryCleanup();
   await app.close();
   process.exit(0);
 };
