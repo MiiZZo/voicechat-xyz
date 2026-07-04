@@ -15,6 +15,7 @@ import { useToasts } from '../state/toast-store.js';
 import { cn } from '../lib/cn.js';
 import { uploadFile } from '../lib/upload.js';
 import { notifyChatMessage } from '../lib/notifications.js';
+import { AudioBubble, isAudioMessage } from './AudioBubble.js';
 
 const MAX_BYTES = 50 * 1024 * 1024;
 
@@ -492,6 +493,10 @@ function FileBubble({ message, isLocal }: { message: FileMessage; isLocal: boole
         )}
       </>
     );
+  }
+
+  if (isAudioMessage(message) && !errored && !uploading && message.url) {
+    return <AudioBubble message={message} isLocal={isLocal} onDownload={handleDownload} />;
   }
 
   return (
