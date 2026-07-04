@@ -70,6 +70,7 @@ export function registerFileRoutes(app: AnyFastify, deps: FileRouteDeps): void {
     if (!meta) return reply.code(404).send({ error: 'not found' });
 
     const path = deps.store.filePath(roomId, meta);
+    const total = meta.size;
     const isImage = meta.mime.startsWith('image/');
     const dispositionType = isImage ? 'inline' : 'attachment';
     const filenameStar = encodeURIComponent(meta.name);
@@ -77,14 +78,71 @@ export function registerFileRoutes(app: AnyFastify, deps: FileRouteDeps): void {
     const asciiFallback = meta.name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, "'");
     reply
       .header('Content-Type', meta.mime)
-      .header('Content-Length', String(meta.size))
       .header(
         'Content-Disposition',
         `${dispositionType}; filename="${asciiFallback}"; filename*=UTF-8''${filenameStar}`,
       )
-      .header('X-Content-Type-Options', 'nosniff');
-    return reply.send(createReadStream(path));
+      .header('X-Content-Type-Options', 'nosniff')
+      // Advertise range support so <audio>/<video> know the resource is
+      // seekable (browsers issue a Range request when currentTime is set;
+      // without this they treat the media as non-seekable and reset to 0).
+      .header('Accept-Ranges', 'bytes');
+
+    const range = parseRange(req.headers['range'], total);
+    if (range === 'unsatisfiable') {
+      return reply
+        .code(416)
+        .header('Content-Range', `bytes */${total}`)
+        // Override the media Content-Type set above so Fastify serializes the
+        // JSON error body instead of rejecting it as an invalid payload type.
+        .type('application/json')
+        .send({ error: 'range not satisfiable' });
+    }
+    if (range) {
+      return reply
+        .code(206)
+        .header('Content-Range', `bytes ${range.start}-${range.end}/${total}`)
+        .header('Content-Length', String(range.end - range.start + 1))
+        .send(createReadStream(path, { start: range.start, end: range.end }));
+    }
+    return reply.header('Content-Length', String(total)).send(createReadStream(path));
   });
+}
+
+/** Parse a single-range HTTP `Range` header against a resource of `total`
+ *  bytes. Returns a byte interval for a 206 response, `'unsatisfiable'` for a
+ *  416, or `null` to send the full body (no header, or a form we don't honor
+ *  such as multi-range). `end` is inclusive, matching `createReadStream`. */
+function parseRange(
+  header: string | string[] | undefined,
+  total: number,
+): { start: number; end: number } | 'unsatisfiable' | null {
+  if (typeof header !== 'string') return null;
+  const m = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!m) return null;
+  const startStr = m[1];
+  const endStr = m[2];
+  if (startStr === '' && endStr === '') return null;
+
+  let start: number;
+  let end: number;
+  if (startStr === '') {
+    // Suffix range: last N bytes.
+    const suffix = Number(endStr);
+    if (!Number.isFinite(suffix) || suffix <= 0) return 'unsatisfiable';
+    start = Math.max(0, total - suffix);
+    end = total - 1;
+  } else {
+    start = Number(startStr);
+    if (!Number.isFinite(start)) return null;
+    end = endStr === '' ? total - 1 : Number(endStr);
+    if (!Number.isFinite(end)) end = total - 1;
+  }
+
+  if (start >= total) return 'unsatisfiable';
+  if (end >= total) end = total - 1;
+  if (start > end) return 'unsatisfiable';
+  return { start, end };
 }
 
 async function authorize(

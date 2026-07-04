@@ -89,6 +89,79 @@ test('full upload + signed download cycle', async () => {
   }
 });
 
+test('serves byte range as 206 partial content (enables audio/video seeking)', async () => {
+  const { app, root } = await buildApp();
+  try {
+    const token = await makeToken('lounge');
+    const content = Buffer.from('0123456789abcdef'); // 16 bytes
+    const { body, headers } = multipartBody('clip.mp3', 'audio/mpeg', content);
+    const upload = await app.inject({
+      method: 'POST',
+      url: '/api/uploads/lounge',
+      headers: { authorization: `Bearer ${token}`, ...headers },
+      payload: body,
+    });
+    assert.equal(upload.statusCode, 200, upload.body);
+    const u = new URL((upload.json() as { url: string }).url);
+
+    // Full response advertises range support.
+    const full = await app.inject({ method: 'GET', url: u.pathname + u.search });
+    assert.equal(full.statusCode, 200);
+    assert.equal(full.headers['accept-ranges'], 'bytes');
+    assert.equal(full.headers['content-length'], '16');
+
+    // Ranged request returns just the requested slice as 206.
+    const part = await app.inject({
+      method: 'GET',
+      url: u.pathname + u.search,
+      headers: { range: 'bytes=4-9' },
+    });
+    assert.equal(part.statusCode, 206);
+    assert.equal(part.headers['content-range'], 'bytes 4-9/16');
+    assert.equal(part.headers['content-length'], '6');
+    assert.equal(part.body, '456789');
+
+    // Open-ended range to end of file.
+    const tail = await app.inject({
+      method: 'GET',
+      url: u.pathname + u.search,
+      headers: { range: 'bytes=10-' },
+    });
+    assert.equal(tail.statusCode, 206);
+    assert.equal(tail.headers['content-range'], 'bytes 10-15/16');
+    assert.equal(tail.body, 'abcdef');
+  } finally {
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('unsatisfiable range returns 416', async () => {
+  const { app, root } = await buildApp();
+  try {
+    const token = await makeToken('lounge');
+    const content = Buffer.from('short'); // 5 bytes
+    const { body, headers } = multipartBody('clip.mp3', 'audio/mpeg', content);
+    const upload = await app.inject({
+      method: 'POST',
+      url: '/api/uploads/lounge',
+      headers: { authorization: `Bearer ${token}`, ...headers },
+      payload: body,
+    });
+    const u = new URL((upload.json() as { url: string }).url);
+    const res = await app.inject({
+      method: 'GET',
+      url: u.pathname + u.search,
+      headers: { range: 'bytes=100-200' },
+    });
+    assert.equal(res.statusCode, 416);
+    assert.equal(res.headers['content-range'], 'bytes */5');
+  } finally {
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('rejects upload without auth', async () => {
   const { app, root } = await buildApp();
   try {
