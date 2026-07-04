@@ -8,9 +8,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { X } from 'lucide-react';
 import {
   Avatar,
@@ -100,15 +100,12 @@ function NotificationOverlay() {
   }, []);
 
   const onClick = async () => {
+    // Идём через Rust-команду, а не через WebviewWindow.show() из JS: только
+    // нативный путь дёргает SetIsVisible(true) на WebView2-контроллере. Голый
+    // show() восстанавливает окно, но контроллер остаётся невидимым после
+    // hide-to-tray → пустой (не перерисованный) фон. См. window_show_main.
     try {
-      const main = await WebviewWindow.getByLabel('main');
-      if (main) {
-        // unminimize нужен если свёрнуто на таскбар, show — если спрятано в
-        // трей через close-to-tray, setFocus — поверх остальных окон.
-        try { await main.unminimize(); } catch { /* not minimized */ }
-        try { await main.show(); } catch { /* not hidden */ }
-        await main.setFocus();
-      }
+      await invoke('window_show_main');
     } catch {
       /* main мог быть закрыт — игнорируем */
     }

@@ -56,6 +56,7 @@ pub fn run() {
             commands::open_external,
             commands::set_tray_mic_muted,
             commands::set_taskbar_overlay_muted,
+            commands::window_show_main,
             commands::app_quit,
         ])
         .setup(|app| {

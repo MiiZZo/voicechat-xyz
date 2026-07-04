@@ -139,6 +139,18 @@ pub fn set_taskbar_overlay_muted(app: AppHandle, muted: bool) -> Result<(), Stri
     crate::tray::set_taskbar_overlay_muted(&app, muted)
 }
 
+/// Показать/восстановить main-окно. Единый путь для клика по уведомлению и
+/// пункта "Открыть" в tray-menu. Критично идти через Rust, а не через JS
+/// `window.show()`: только здесь дёргается парный `SetIsVisible(true)` к
+/// hide-time'овскому `SetIsVisible(false)` (см. lib.rs CloseRequested).
+/// Без него WebView2-контроллер остаётся невидимым и окно восстанавливается
+/// с пустым (не перерисованным) фоном. Плюс эмитит window:visibility=true,
+/// снимая vo-hidden/power-save класс.
+#[tauri::command]
+pub fn window_show_main(app: AppHandle) {
+    crate::tray::show_main_window(&app);
+}
+
 /// Полный выход из приложения. Вызывается из кастомного tray-menu (пункт
 /// "Выйти"). Перед app.exit ставит quitting=true, иначе close-requested
 /// handler примет это за обычное закрытие main-окна и спрячет его в трей.

@@ -13,7 +13,6 @@ import { createRoot } from 'react-dom/client';
 import { invoke } from '@tauri-apps/api/core';
 import { emitTo, listen } from '@tauri-apps/api/event';
 import { getCurrentWindow, primaryMonitor } from '@tauri-apps/api/window';
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { LogicalPosition, LogicalSize } from '@tauri-apps/api/dpi';
 import { Mic, MicOff, LogOut, MaximizeIcon, Power } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -27,11 +26,10 @@ function hide() {
 }
 
 async function openMain() {
-  const main = await WebviewWindow.getByLabel('main');
-  if (!main) return;
-  try { await main.unminimize(); } catch { /* not minimized */ }
-  try { await main.show(); } catch { /* not hidden */ }
-  await main.setFocus();
+  // Единый Rust-путь восстановления (SetIsVisible(true) + unminimize + show +
+  // focus). Прямой WebviewWindow.show() из JS оставлял бы контроллер WebView2
+  // невидимым после hide-to-tray → пустой фон. См. window_show_main.
+  await invoke('window_show_main');
 }
 
 /** Размещаем окно по умолчанию СНИЗУ-СЛЕВА от курсора: меню "выпадает" вниз
@@ -48,7 +46,6 @@ async function positionAndShow(rootEl: HTMLElement, click: ClickPos) {
   const mon = await primaryMonitor();
   // click позиция приходит в физических пикселях (см. Rust PhysicalPosition).
   const scale = mon?.scaleFactor ?? 1;
-  const monW = mon ? mon.size.width / scale : 1920;
   const monH = mon ? mon.size.height / scale : 1080;
   const cx = click.x / scale;
   const cy = click.y / scale;

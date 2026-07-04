@@ -107,7 +107,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     }
 }
 
-fn show_main_window(app: &AppHandle) {
+pub(crate) fn show_main_window(app: &AppHandle) {
     if let Some(win) = app.get_webview_window("main") {
         // Парный SetIsVisible(true) к hide-time'овскому SetIsVisible(false)
         // из lib.rs CloseRequested. Делаем ДО win.show(), чтобы Chromium успел
