@@ -46,8 +46,15 @@ services:
       ROOMS_FILE: /app/apps/server/rooms.yaml
       LOG_LEVEL: info
       UPLOAD_DIR: /data/uploads
+      # 7 days — files must outlive the chat history that references them.
+      UPLOAD_TTL_HOURS: 168
+      HISTORY_DIR: /data/history
+      HISTORY_TTL_DAYS: 7
     volumes:
       - lobby_uploads:/data/uploads
+      # Persist chat history across redeploys/restarts (default ./history is
+      # inside the container and would be lost otherwise).
+      - lobby_history:/data/history
     depends_on:
       - livekit
 
@@ -55,3 +62,4 @@ volumes:
   caddy_data:
   caddy_config:
   lobby_uploads:
+  lobby_history:
