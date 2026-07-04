@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Luxury Theme · Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:           hsl(240 10% 4%);
+    --bg-elevated:  hsl(240 6% 10%);
+    --bg-muted:     hsl(240 4% 14%);
+    --border:       hsl(240 4% 16%);
+    --fg:           hsl(0 0% 98%);
+    --fg-muted:     hsl(240 5% 65%);
+    --fg-subtle:    hsl(240 4% 46%);
+    --hair:         hsla(0,0%,100%,0.05);
+    --hair-strong:  hsla(0,0%,100%,0.10);
+    --pearl:        hsl(240 8% 92%);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 0%, hsla(240, 10%, 70%, 0.04), transparent 70%),
+      linear-gradient(180deg, hsl(240 12% 3%) 0%, var(--bg) 100%);
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/></svg>");
+  }
+
+  .frame {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 64px 64px 120px;
+  }
+
+  /* ===== Top ===== */
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--hair);
+    padding-bottom: 22px;
+    margin-bottom: 80px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+  .top .mark {
+    font-family: 'Instrument Serif', serif;
+    font-size: 22px;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+    text-transform: none;
+  }
+
+  /* ===== Hero ===== */
+  .hero {
+    margin-bottom: 80px;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 64px;
+    align-items: end;
+  }
+  .hero h1 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: clamp(56px, 9vw, 120px);
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+    background: linear-gradient(180deg, hsl(240 8% 96%) 0%, hsl(240 6% 60%) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero p {
+    font-size: 16px;
+    color: var(--fg-muted);
+    line-height: 1.65;
+    max-width: 48ch;
+    font-weight: 300;
+  }
+  .hero p .tag {
+    color: var(--fg);
+    font-weight: 500;
+  }
+
+  /* ===== Featured (Velvet Onyx) ===== */
+  .featured {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    margin-bottom: 32px;
+    background: linear-gradient(160deg, var(--bg-elevated) 0%, hsl(240 6% 6%) 100%);
+    border: 1px solid var(--hair-strong);
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    transition: 0.4s cubic-bezier(0.2,0.8,0.2,1);
+  }
+  .featured::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 200px;
+    background:
+      radial-gradient(ellipse 60% 80% at 20% 0%, hsla(240, 12%, 70%, 0.16), transparent 60%),
+      radial-gradient(ellipse 50% 60% at 90% 0%, hsla(240, 10%, 80%, 0.10), transparent 65%);
+    pointer-events: none;
+  }
+  .featured:hover {
+    border-color: hsla(240, 10%, 90%, 0.18);
+    transform: translateY(-2px);
+  }
+  .featured-inner {
+    position: relative;
+    padding: 48px;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 56px;
+    align-items: center;
+  }
+  .featured-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--pearl);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .featured-tag::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--pearl);
+    box-shadow: 0 0 12px hsla(240, 10%, 90%, 0.4);
+  }
+  .featured-name {
+    font-family: 'Instrument Serif', serif;
+    font-size: 64px;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 20px;
+    background: linear-gradient(180deg, hsl(240 8% 96%) 0%, hsl(240 6% 64%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .featured-desc {
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--fg-muted);
+    margin-bottom: 28px;
+    font-weight: 300;
+    max-width: 52ch;
+  }
+  .featured-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    background: linear-gradient(180deg, hsl(240 6% 98%), hsl(240 6% 82%));
+    color: var(--bg);
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6.4px;
+    transition: 0.25s ease;
+  }
+  .featured:hover .featured-cta {
+    background: linear-gradient(180deg, hsl(240 6% 100%), hsl(240 6% 86%));
+    box-shadow: 0 12px 32px -10px hsla(240, 10%, 90%, 0.2);
+  }
+
+  /* preview side */
+  .featured-preview {
+    aspect-ratio: 4/3;
+    border-radius: 10px;
+    background: var(--bg);
+    border: 1px solid var(--hair-strong);
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 24px 64px -24px rgba(0,0,0,0.6);
+  }
+  .featured-preview-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 10%, hsla(240, 10%, 70%, 0.18), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 90% 20%, hsla(240, 8%, 78%, 0.08), transparent 65%),
+      linear-gradient(180deg, hsl(240 12% 3%), hsl(240 10% 4%));
+  }
+  .featured-preview-callbar {
+    position: absolute;
+    bottom: 16%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px;
+    border-radius: 999px;
+    background: hsla(240, 8%, 70%, 0.05);
+    backdrop-filter: blur(12px);
+    border: 1px solid hsla(240, 8%, 90%, 0.10);
+    box-shadow: 0 12px 32px -12px rgba(0,0,0,0.6);
+  }
+  .featured-preview-callbar .dot {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, hsla(240, 8%, 22%, 0.6), hsla(240, 8%, 12%, 0.6));
+    border: 1px solid hsla(0,0%,100%,0.1);
+  }
+  .featured-preview-callbar .dot.on {
+    background: linear-gradient(180deg, hsl(240 8% 96%), hsl(240 6% 78%));
+  }
+  .featured-preview-callbar .dot.red {
+    background: linear-gradient(180deg, hsl(346 77% 49%), hsl(346 70% 36%));
+  }
+  .featured-preview-title {
+    position: absolute;
+    top: 22%;
+    left: 0; right: 0;
+    text-align: center;
+    font-family: 'Instrument Serif', serif;
+    font-size: 36px;
+    line-height: 1;
+    letter-spacing: -0.025em;
+    background: linear-gradient(180deg, hsl(240 8% 96%) 0%, hsl(240 6% 60%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .featured-preview-sub {
+    position: absolute;
+    top: 46%;
+    left: 0; right: 0;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+
+  /* ===== Alternatives row ===== */
+  .alt-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-top: 1px solid var(--hair);
+    padding-top: 28px;
+    margin-bottom: 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+  .alt-head .label {
+    font-family: 'Instrument Serif', serif;
+    font-size: 20px;
+    color: var(--fg);
+    text-transform: none;
+    letter-spacing: -0.01em;
+  }
+
+  .alts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 80px;
+  }
+  .alt {
+    text-decoration: none;
+    color: inherit;
+    background: linear-gradient(160deg, var(--bg-elevated) 0%, hsl(240 6% 6%) 100%);
+    border: 1px solid var(--hair);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: 0.3s ease;
+    display: block;
+    cursor: pointer;
+  }
+  .alt:hover {
+    border-color: var(--hair-strong);
+    transform: translateY(-2px);
+  }
+  .alt-preview {
+    aspect-ratio: 16/9;
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--hair);
+  }
+  .alt-preview-01 {
+    background: linear-gradient(180deg, hsl(240 10% 3%) 0%, var(--bg) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .alt-preview-01 .t {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(36px, 5vw, 64px);
+    line-height: 0.95;
+    text-align: center;
+    background: linear-gradient(180deg, hsl(240 8% 96%) 0%, hsl(240 6% 60%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .alt-preview-02 {
+    background:
+      linear-gradient(180deg, hsl(240 10% 3%) 0%, var(--bg) 100%),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+    background-blend-mode: normal;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .alt-preview-02 .t {
+    font-family: 'Geist', sans-serif;
+    font-weight: 700;
+    font-size: clamp(36px, 5vw, 64px);
+    letter-spacing: -0.035em;
+    background: linear-gradient(180deg, hsl(240 6% 96%) 0%, hsl(240 4% 56%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .alt-preview-02 .t .s { color: hsl(240 4% 56%); -webkit-text-fill-color: hsl(240 4% 56%); }
+
+  .alt-body {
+    padding: 22px 24px 24px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 16px;
+    align-items: baseline;
+  }
+  .alt-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--fg-subtle);
+  }
+  .alt-name {
+    font-family: 'Instrument Serif', serif;
+    font-size: 24px;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+  .alt-go {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+    transition: 0.2s ease;
+  }
+  .alt:hover .alt-go { color: var(--fg); }
+
+  .alt-desc {
+    padding: 0 24px 16px;
+    grid-column: 1 / -1;
+    font-size: 13px;
+    color: var(--fg-muted);
+    line-height: 1.55;
+    font-weight: 300;
+  }
+  .alt-meta {
+    padding: 0 24px 22px;
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    padding: 4px 9px;
+    border: 1px solid var(--hair);
+    border-radius: 999px;
+    color: var(--fg-subtle);
+    text-transform: uppercase;
+  }
+
+  /* ===== Note ===== */
+  .note {
+    border-top: 1px solid var(--hair);
+    padding-top: 28px;
+    display: grid;
+    grid-template-columns: 1fr 2.5fr;
+    gap: 48px;
+  }
+  .note-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+  .note-text {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--fg-muted);
+    max-width: 64ch;
+    font-weight: 300;
+  }
+  .note-text code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--fg);
+    background: hsla(240, 8%, 70%, 0.05);
+    padding: 2px 7px;
+    border: 1px solid var(--hair);
+    border-radius: 4px;
+  }
+  .note-text strong { color: var(--fg); font-weight: 500; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero, .featured, .alt-head, .alts, .note { animation: rise 0.9s cubic-bezier(0.2,0.8,0.2,1) backwards; }
+  .featured { animation-delay: 0.1s; }
+  .alt-head { animation-delay: 0.2s; }
+  .alts { animation-delay: 0.3s; }
+  .note { animation-delay: 0.4s; }
+
+  @media (max-width: 980px) {
+    .frame { padding: 32px 24px 80px; }
+    .hero { grid-template-columns: 1fr; gap: 32px; }
+    .featured-inner { grid-template-columns: 1fr; gap: 32px; padding: 28px; }
+    .alts { grid-template-columns: 1fr; }
+    .note { grid-template-columns: 1fr; gap: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <header class="top">
+    <span class="mark">Voicechat</span>
+    <span>Luxury theme · concepts · 2026</span>
+  </header>
+
+  <section class="hero">
+    <h1>Pick a direction.</h1>
+    <p>Three takes on a dark luxury theme for voicechat. All built on the existing zinc-240 palette — no foreign hues, no italic, no decoration that gets in the way of the call. <span class="tag">Velvet Onyx</span> is the current focus; the other two are alternatives you can compare against.</p>
+  </section>
+
+  <!-- =============== FEATURED: VELVET ONYX =============== -->
+  <a href="./03-velvet-onyx.html" class="featured">
+    <div class="featured-inner">
+      <div>
+        <div class="featured-tag">№ 03 · CURRENT FOCUS</div>
+        <div class="featured-name">Velvet Onyx</div>
+        <p class="featured-desc">Atmospheric depth. Soft pearl light suspended in matte glass, drifting halos, breathing speaking indicators. Full component preview inside: call bar, icon-button states, inputs, selects, toggles, tabs, sliders, participant tiles, toasts and palette — all on voicechat's actual color tokens.</p>
+        <span class="featured-cta">Open full preview →</span>
+      </div>
+      <div class="featured-preview">
+        <div class="featured-preview-bg"></div>
+        <div class="featured-preview-title">Velvet Onyx</div>
+        <div class="featured-preview-sub">VOICECHAT · THEME 03</div>
+        <div class="featured-preview-callbar">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot on"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot red"></span>
+        </div>
+      </div>
+    </div>
+  </a>
+
+  <!-- =============== ALTERNATIVES =============== -->
+  <div class="alt-head">
+    <span class="label">Alternatives</span>
+    <span>two more directions on the same palette</span>
+  </div>
+
+  <div class="alts">
+
+    <a href="./01-obsidian-atelier.html" class="alt">
+      <div class="alt-preview alt-preview-01">
+        <div class="t">Obsidian<br>Atelier</div>
+      </div>
+      <div class="alt-body">
+        <span class="alt-num">№ 01</span>
+        <span class="alt-name">Obsidian Atelier</span>
+        <span class="alt-go">View →</span>
+      </div>
+      <p class="alt-desc">Editorial calm. Generous whitespace, hairline dividers, upright serif headlines, asymmetric layout. Quieter than Velvet Onyx — no halos, no glass.</p>
+      <div class="alt-meta">
+        <span class="pill">Editorial</span>
+        <span class="pill">Hairline</span>
+        <span class="pill">Calm</span>
+      </div>
+    </a>
+
+    <a href="./02-carbon-noir.html" class="alt">
+      <div class="alt-preview alt-preview-02">
+        <div class="t">CARBON<span class="s">/</span>NOIR</div>
+      </div>
+      <div class="alt-body">
+        <span class="alt-num">№ 02</span>
+        <span class="alt-name">Carbon Noir</span>
+        <span class="alt-go">View →</span>
+      </div>
+      <p class="alt-desc">Industrial precision. 1px grid throughout, mono technical labels, numeric callouts, brushed-metal gradient on the accent. Dense rather than atmospheric.</p>
+      <div class="alt-meta">
+        <span class="pill">Industrial</span>
+        <span class="pill">Mono</span>
+        <span class="pill">Dense</span>
+      </div>
+    </a>
+
+  </div>
+
+  <div class="note">
+    <span class="note-label">How to choose</span>
+    <p class="note-text">
+      All three concepts use the same zinc-240 palette from <code>apps/client/tailwind.config.ts</code> — they differ in <strong>typography, composition and texture</strong>, not in color. <strong>Velvet Onyx</strong> is the one shown with the full component library (call bar, icon-button states, buttons, inputs, selects, switches, sliders, tabs, participant tiles, toasts). The other two demonstrate the same call bar + buttons + inputs + icon states for direct comparison. None are wired to the app yet — tell me which direction (or which elements from which) and I'll add it as a real switchable theme in <code>apps/client</code> and <code>apps/client-tauri</code>.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

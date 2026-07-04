@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Velvet Onyx · Luxury Theme</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     VELVET ONYX — luxury theme for Voicechat
+     Built on top of the existing zinc-240 neutral palette.
+     No italic, no warm tints, no "steroid" type.
+     The luxury comes from layered gradients + glass + soft halos.
+     ============================================================ */
+  :root {
+    /* Anchor surface tokens — mapped 1:1 from the current voicechat tailwind config */
+    --bg:           hsl(240 10% 4%);     /* same as bg.DEFAULT */
+    --bg-elevated:  hsl(240 6% 10%);     /* same as bg.elevated */
+    --bg-muted:     hsl(240 4% 14%);     /* same as bg.muted */
+    --border:       hsl(240 4% 16%);
+    --fg:           hsl(0 0% 98%);
+    --fg-muted:     hsl(240 5% 65%);
+    --fg-subtle:    hsl(240 4% 46%);
+    --destructive:  hsl(346 77% 49%);
+
+    /* Velvet Onyx additions — strictly within the cool zinc family */
+    --bg-deep:      hsl(240 12% 3%);     /* slightly deeper than default for atmosphere */
+    --glass:        hsla(240, 8%, 70%, 0.04);
+    --glass-2:      hsla(240, 8%, 70%, 0.06);
+    --glass-bd:     hsla(240, 8%, 90%, 0.08);
+    --glass-bd-2:   hsla(240, 8%, 90%, 0.14);
+
+    /* Soft halo accent — cool pearl, no warmth */
+    --halo:         hsl(240 8% 78%);
+    --halo-deep:    hsl(240 6% 48%);
+    --halo-glow:    hsla(240, 12%, 80%, 0.18);
+
+    /* Hairlines — graded for hierarchy */
+    --hair:         hsla(0, 0%, 100%, 0.05);
+    --hair-strong:  hsla(0, 0%, 100%, 0.10);
+
+    /* Radii — match the project (tailwind: lg 0.625rem, md 0.4rem, sm 0.25rem) */
+    --r-sm: 4px;
+    --r-md: 6.4px;
+    --r-lg: 10px;
+    --r-pill: 999px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  body {
+    min-height: 100vh;
+    position: relative;
+    background:
+      radial-gradient(ellipse 55% 45% at 18% 8%,  hsla(240, 10%, 70%, 0.10), transparent 60%),
+      radial-gradient(ellipse 60% 45% at 90% 18%, hsla(240,  8%, 78%, 0.05), transparent 65%),
+      radial-gradient(ellipse 80% 55% at 50% 115%, hsla(240, 10%, 60%, 0.08), transparent 65%),
+      linear-gradient(180deg, var(--bg-deep) 0%, var(--bg) 50%, var(--bg-deep) 100%);
+  }
+
+  /* Drifting halo */
+  body::before {
+    content: '';
+    position: fixed;
+    width: 70vmax; height: 70vmax;
+    top: -25vmax; left: -25vmax;
+    background: radial-gradient(circle at center, hsla(240, 10%, 70%, 0.08) 0%, transparent 50%);
+    filter: blur(60px);
+    pointer-events: none;
+    animation: drift 24s ease-in-out infinite alternate;
+    z-index: 0;
+  }
+
+  /* Same grain density as the actual app (opacity 0.025 in index.css) */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/></svg>");
+  }
+
+  @keyframes drift {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(22vmax, 10vmax) scale(1.18); }
+  }
+
+  .frame {
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 56px 64px 96px;
+  }
+
+  /* ============================================================
+     TOP BAR
+     ============================================================ */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 80px;
+  }
+  .logo {
+    font-family: 'Instrument Serif', serif;
+    font-size: 26px;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    color: var(--fg);
+  }
+  .logo .sub {
+    margin-left: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+    vertical-align: middle;
+  }
+  .topbar nav {
+    display: flex;
+    gap: 28px;
+    font-size: 13px;
+    color: var(--fg-muted);
+  }
+  .topbar nav a {
+    color: var(--fg-muted);
+    text-decoration: none;
+    transition: color 0.25s ease;
+    cursor: pointer;
+  }
+  .topbar nav a:hover { color: var(--fg); }
+  .topbar nav a.active { color: var(--fg); }
+
+  /* ============================================================
+     HERO
+     ============================================================ */
+  .hero {
+    text-align: center;
+    margin-bottom: 96px;
+  }
+  .hero-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+    margin-bottom: 28px;
+  }
+  .hero-eyebrow::before,
+  .hero-eyebrow::after {
+    content: '·';
+    margin: 0 12px;
+    color: var(--fg-subtle);
+  }
+  .hero h1 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: clamp(64px, 9.5vw, 140px);
+    line-height: 0.96;
+    letter-spacing: -0.025em;
+    margin-bottom: 28px;
+    background: linear-gradient(180deg, hsl(240 8% 96%) 0%, hsl(240 6% 64%) 70%, hsl(240 4% 40%) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero p {
+    font-size: 16px;
+    color: var(--fg-muted);
+    line-height: 1.55;
+    max-width: 56ch;
+    margin: 0 auto;
+    font-weight: 300;
+  }
+
+  /* ============================================================
+     SECTION HEAD
+     ============================================================ */
+  .section {
+    margin-bottom: 64px;
+  }
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 28px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .section-head h2 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: 28px;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+  .section-head .id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--fg-subtle);
+    text-transform: uppercase;
+  }
+
+  /* ============================================================
+     GLASS SURFACE
+     ============================================================ */
+  .glass {
+    background: var(--glass);
+    backdrop-filter: blur(28px) saturate(120%);
+    -webkit-backdrop-filter: blur(28px) saturate(120%);
+    border: 1px solid var(--glass-bd);
+    border-radius: var(--r-lg);
+    position: relative;
+  }
+  .glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--r-lg);
+    padding: 1px;
+    background: linear-gradient(135deg, hsla(240, 10%, 92%, 0.18), hsla(240, 10%, 92%, 0.02) 50%, transparent 75%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* ============================================================
+     CALL BAR — the iconic voicechat row
+     ============================================================ */
+  .callbar-wrap { display: flex; justify-content: center; }
+  .callbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px;
+    border-radius: var(--r-pill);
+    background: var(--glass-2);
+    backdrop-filter: blur(28px) saturate(140%);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
+    border: 1px solid var(--glass-bd);
+    box-shadow:
+      0 24px 64px -24px rgba(0,0,0,0.6),
+      inset 0 1px 0 hsla(240, 10%, 92%, 0.08);
+  }
+
+  .icon-btn {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    background:
+      linear-gradient(180deg, hsla(240, 8%, 22%, 0.5) 0%, hsla(240, 8%, 12%, 0.5) 100%);
+    color: var(--fg-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    position: relative;
+  }
+  .icon-btn:hover {
+    color: var(--fg);
+    background: linear-gradient(180deg, hsla(240, 10%, 28%, 0.6) 0%, hsla(240, 8%, 14%, 0.6) 100%);
+    border-color: var(--hair-strong);
+  }
+  .icon-btn.active {
+    color: var(--bg);
+    background: linear-gradient(180deg, hsl(240 8% 96%) 0%, hsl(240 6% 78%) 100%);
+    box-shadow: 0 4px 18px -4px var(--halo-glow), inset 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .icon-btn.muted {
+    color: var(--destructive);
+    background: linear-gradient(180deg, hsla(346, 70%, 22%, 0.5) 0%, hsla(346, 70%, 14%, 0.5) 100%);
+    border-color: hsla(346, 70%, 50%, 0.25);
+  }
+  .icon-btn.hangup {
+    background: linear-gradient(180deg, hsl(346 77% 49%) 0%, hsl(346 70% 36%) 100%);
+    color: var(--fg);
+    box-shadow: 0 6px 20px -6px hsla(346, 77%, 49%, 0.6);
+  }
+  .icon-btn.hangup:hover {
+    background: linear-gradient(180deg, hsl(346 80% 54%) 0%, hsl(346 70% 38%) 100%);
+  }
+  .icon-btn svg { width: 18px; height: 18px; }
+  .icon-btn.lg { width: 52px; height: 52px; }
+  .icon-btn.lg svg { width: 20px; height: 20px; }
+  .icon-btn.sm { width: 32px; height: 32px; border-radius: var(--r-md); }
+  .icon-btn.sm svg { width: 14px; height: 14px; }
+
+  .callbar-sep {
+    width: 1px;
+    align-self: stretch;
+    margin: 8px 4px;
+    background: var(--hair);
+  }
+  .callbar-caption {
+    text-align: center;
+    margin-top: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+
+  /* ============================================================
+     ICON BUTTON STATES — explicit table
+     ============================================================ */
+  .icon-states {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1px;
+    background: var(--hair);
+    border: 1px solid var(--hair);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+  }
+  .icon-state {
+    background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg) 100%);
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .icon-state .lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+
+  /* ============================================================
+     BUTTONS — primary, secondary, ghost, destructive, sizes
+     ============================================================ */
+  .btn {
+    font-family: 'Geist', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.005em;
+    padding: 10px 18px;
+    border-radius: var(--r-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1;
+  }
+  .btn svg { width: 14px; height: 14px; }
+
+  .btn-primary {
+    background: linear-gradient(180deg, hsl(240 6% 98%) 0%, hsl(240 6% 86%) 100%);
+    color: var(--bg);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.4) inset,
+      0 8px 24px -10px var(--halo-glow);
+  }
+  .btn-primary:hover {
+    background: linear-gradient(180deg, hsl(240 6% 100%) 0%, hsl(240 6% 90%) 100%);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.5) inset,
+      0 12px 32px -10px var(--halo-glow);
+  }
+  .btn-primary:active {
+    background: linear-gradient(180deg, hsl(240 6% 92%) 0%, hsl(240 6% 80%) 100%);
+  }
+
+  .btn-secondary {
+    background: linear-gradient(180deg, var(--bg-muted) 0%, hsl(240 4% 10%) 100%);
+    color: var(--fg);
+    border-color: var(--hair-strong);
+  }
+  .btn-secondary:hover {
+    background: linear-gradient(180deg, hsl(240 4% 18%) 0%, hsl(240 4% 12%) 100%);
+    border-color: var(--glass-bd-2);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--fg-muted);
+    border-color: var(--hair);
+  }
+  .btn-ghost:hover {
+    color: var(--fg);
+    background: var(--glass);
+    border-color: var(--hair-strong);
+  }
+
+  .btn-destructive {
+    background: linear-gradient(180deg, hsl(346 77% 49%) 0%, hsl(346 70% 38%) 100%);
+    color: var(--fg);
+    box-shadow: 0 6px 20px -8px hsla(346, 77%, 49%, 0.5);
+  }
+  .btn-destructive:hover {
+    background: linear-gradient(180deg, hsl(346 80% 54%) 0%, hsl(346 70% 40%) 100%);
+  }
+
+  .btn[disabled] {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .btn-sm { font-size: 12px; padding: 7px 12px; border-radius: var(--r-sm); }
+  .btn-lg { font-size: 14px; padding: 13px 22px; border-radius: var(--r-md); }
+
+  /* ============================================================
+     INPUTS
+     ============================================================ */
+  .input {
+    width: 100%;
+    background: linear-gradient(180deg, hsl(240 6% 8%) 0%, hsl(240 6% 6%) 100%);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-family: 'Geist', sans-serif;
+    font-size: 14px;
+    padding: 11px 14px;
+    border-radius: var(--r-md);
+    outline: none;
+    transition: 0.2s ease;
+  }
+  .input::placeholder { color: var(--fg-subtle); }
+  .input:hover {
+    border-color: var(--hair-strong);
+  }
+  .input:focus {
+    border-color: hsl(240 10% 70%);
+    box-shadow:
+      0 0 0 3px hsla(240, 10%, 75%, 0.10),
+      inset 0 0 0 1px hsla(240, 10%, 92%, 0.06);
+  }
+  .input[aria-invalid="true"] {
+    border-color: hsla(346, 70%, 50%, 0.6);
+  }
+  .input[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 3px hsla(346, 70%, 50%, 0.12);
+  }
+  .input[disabled] { opacity: 0.45; pointer-events: none; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field-label {
+    font-size: 12px;
+    color: var(--fg-muted);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .field-hint {
+    font-size: 12px;
+    color: var(--fg-subtle);
+  }
+  .field-err {
+    font-size: 12px;
+    color: hsl(346 77% 60%);
+  }
+
+  /* Input with leading icon */
+  .input-wrap {
+    position: relative;
+    width: 100%;
+  }
+  .input-wrap .leading {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--fg-subtle);
+    pointer-events: none;
+    width: 16px; height: 16px;
+  }
+  .input-wrap .input { padding-left: 38px; }
+  .input-wrap .trailing {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--fg-subtle);
+    cursor: pointer;
+  }
+
+  textarea.input {
+    resize: vertical;
+    min-height: 96px;
+    font-family: 'Geist', sans-serif;
+    line-height: 1.55;
+  }
+
+  /* Select */
+  select.input {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 12px;
+    padding-right: 36px;
+  }
+
+  /* ============================================================
+     SWITCH / CHECKBOX / RADIO
+     ============================================================ */
+  .switch {
+    width: 38px; height: 22px;
+    border-radius: var(--r-pill);
+    background: linear-gradient(180deg, hsl(240 4% 14%), hsl(240 4% 10%));
+    border: 1px solid var(--border);
+    position: relative;
+    cursor: pointer;
+    transition: 0.3s ease;
+    flex-shrink: 0;
+  }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, hsl(240 4% 60%), hsl(240 4% 38%));
+    transition: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .switch.on {
+    background: linear-gradient(180deg, hsl(240 6% 92%), hsl(240 6% 70%));
+    border-color: transparent;
+    box-shadow: 0 2px 12px -2px var(--halo-glow);
+  }
+  .switch.on::after {
+    left: 18px;
+    background: linear-gradient(180deg, var(--bg-elevated), var(--bg));
+  }
+
+  .check {
+    width: 18px; height: 18px;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, hsl(240 6% 10%), hsl(240 6% 6%));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+  .check:hover { border-color: var(--hair-strong); }
+  .check.on {
+    background: linear-gradient(180deg, hsl(240 6% 96%), hsl(240 6% 80%));
+    border-color: transparent;
+  }
+  .check.on::after {
+    content: '';
+    width: 10px; height: 6px;
+    border-left: 1.6px solid var(--bg);
+    border-bottom: 1.6px solid var(--bg);
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+
+  .radio {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, hsl(240 6% 10%), hsl(240 6% 6%));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+  .radio:hover { border-color: var(--hair-strong); }
+  .radio.on::after {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, hsl(240 6% 96%), hsl(240 6% 78%));
+  }
+  .radio.on { border-color: hsla(240, 10%, 80%, 0.5); }
+
+  /* ============================================================
+     SLIDER
+     ============================================================ */
+  .slider {
+    height: 4px;
+    border-radius: 999px;
+    background: hsl(240 4% 14%);
+    position: relative;
+    cursor: pointer;
+  }
+  .slider-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, hsl(240 6% 60%), hsl(240 6% 92%));
+    width: 64%;
+  }
+  .slider-knob {
+    position: absolute;
+    left: 64%;
+    top: 50%;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, hsl(240 6% 98%), hsl(240 6% 80%));
+    box-shadow: 0 2px 12px -2px var(--halo-glow), 0 0 0 1px hsla(240, 6%, 50%, 0.4);
+    transform: translate(-50%, -50%);
+    cursor: grab;
+  }
+
+  /* ============================================================
+     BADGE / PILL
+     ============================================================ */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: var(--r-pill);
+    background: var(--glass-2);
+    border: 1px solid var(--glass-bd);
+    color: var(--fg-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .badge.live::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: hsl(140 60% 55%);
+    box-shadow: 0 0 8px hsl(140 60% 55%);
+  }
+  .badge.warn { color: hsl(40 80% 70%); border-color: hsla(40, 80%, 50%, 0.25); }
+
+  /* ============================================================
+     TABS
+     ============================================================ */
+  .tabs {
+    display: inline-flex;
+    padding: 4px;
+    background: linear-gradient(180deg, var(--bg-muted), hsl(240 4% 10%));
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    gap: 2px;
+  }
+  .tab {
+    padding: 7px 14px;
+    font-size: 13px;
+    color: var(--fg-muted);
+    cursor: pointer;
+    border-radius: var(--r-sm);
+    transition: 0.2s ease;
+    font-weight: 500;
+  }
+  .tab:hover { color: var(--fg); }
+  .tab.active {
+    background: linear-gradient(180deg, hsl(240 6% 98%), hsl(240 6% 82%));
+    color: var(--bg);
+    box-shadow: 0 2px 8px -2px var(--halo-glow);
+  }
+
+  /* ============================================================
+     PARTICIPANT TILES
+     ============================================================ */
+  .participants {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .tile {
+    aspect-ratio: 4/3;
+    border-radius: var(--r-lg);
+    background: linear-gradient(160deg, var(--bg-elevated) 0%, var(--bg-deep) 100%);
+    border: 1px solid var(--glass-bd);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tile-avatar {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 35% 30%, hsla(0, 0%, 100%, 0.35), transparent 50%),
+      radial-gradient(circle at 50% 50%, hsl(240 8% 32%) 0%, hsl(240 10% 12%) 80%);
+    box-shadow:
+      0 0 48px hsla(240, 10%, 70%, 0.10),
+      inset 0 -8px 16px rgba(0,0,0,0.5),
+      inset 0 2px 6px rgba(255,255,255,0.08);
+  }
+  .tile.speaking { border-color: hsla(240, 12%, 90%, 0.35); }
+  .tile.speaking::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--r-lg);
+    border: 1px solid hsla(240, 12%, 90%, 0.30);
+    animation: speakingPulse 1.6s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes speakingPulse {
+    0%, 100% { box-shadow: 0 0 0 0 hsla(240, 12%, 90%, 0.4); }
+    50% { box-shadow: 0 0 0 5px hsla(240, 12%, 90%, 0); }
+  }
+  .tile-foot {
+    position: absolute;
+    bottom: 10px; left: 12px; right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--fg);
+  }
+  .tile-name {
+    background: hsla(240, 10%, 5%, 0.5);
+    backdrop-filter: blur(8px);
+    padding: 3px 8px;
+    border-radius: var(--r-sm);
+    font-weight: 500;
+  }
+  .tile-mic {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: hsla(240, 10%, 5%, 0.5);
+    backdrop-filter: blur(8px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fg);
+  }
+  .tile-mic.muted { color: var(--destructive); }
+
+  /* ============================================================
+     SETTINGS LIST CARD
+     ============================================================ */
+  .settings-card { padding: 8px 24px; }
+  .pref-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--hair);
+  }
+  .pref-row:last-child { border-bottom: none; }
+  .pref-key { font-size: 14px; color: var(--fg); font-weight: 500; }
+  .pref-desc {
+    display: block;
+    font-size: 12px;
+    color: var(--fg-subtle);
+    margin-top: 4px;
+    font-weight: 400;
+  }
+
+  /* ============================================================
+     TOAST
+     ============================================================ */
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px 12px 12px;
+    border-radius: var(--r-md);
+    background: var(--glass-2);
+    backdrop-filter: blur(28px) saturate(140%);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
+    border: 1px solid var(--glass-bd);
+    box-shadow:
+      0 16px 48px -16px rgba(0,0,0,0.7),
+      inset 0 1px 0 hsla(240, 10%, 92%, 0.08);
+    max-width: 360px;
+  }
+  .toast-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: hsl(140 60% 55%);
+    box-shadow: 0 0 12px hsla(140, 60%, 55%, 0.7);
+    flex-shrink: 0;
+  }
+  .toast-body { flex: 1; }
+  .toast-title { font-size: 13px; color: var(--fg); font-weight: 500; }
+  .toast-sub { font-size: 12px; color: var(--fg-subtle); margin-top: 2px; }
+
+  /* ============================================================
+     PALETTE
+     ============================================================ */
+  .palette {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
+  }
+  .swatch {
+    aspect-ratio: 1 / 1.15;
+    border-radius: var(--r-md);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border: 1px solid var(--glass-bd);
+    position: relative;
+    overflow: hidden;
+  }
+  .swatch::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.06), transparent 50%);
+    pointer-events: none;
+  }
+  .swatch-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: hsla(0, 0%, 100%, 0.85);
+  }
+  .swatch-hex {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: hsla(0, 0%, 100%, 0.55);
+  }
+  .swatch.light .swatch-name,
+  .swatch.light .swatch-hex { color: hsla(240, 10%, 4%, 0.85); }
+  .swatch.light .swatch-hex { color: hsla(240, 10%, 4%, 0.55); }
+
+  /* ============================================================
+     LAYOUT HELPERS
+     ============================================================ */
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .row.gap-lg { gap: 20px; }
+  .col { display: flex; flex-direction: column; gap: 16px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  .p-lg { padding: 28px; }
+  .p-xl { padding: 40px; }
+
+  /* ============================================================
+     FOOTER
+     ============================================================ */
+  .footer {
+    margin-top: 96px;
+    padding-top: 32px;
+    border-top: 1px solid var(--hair);
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+  .footer a { color: var(--fg-muted); text-decoration: none; }
+  .footer a:hover { color: var(--fg); }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero, .section { animation: rise 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+  .section:nth-of-type(2) { animation-delay: 0.1s; }
+  .section:nth-of-type(3) { animation-delay: 0.2s; }
+  .section:nth-of-type(4) { animation-delay: 0.3s; }
+  .section:nth-of-type(5) { animation-delay: 0.4s; }
+
+  @media (max-width: 980px) {
+    .frame { padding: 32px 20px; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .grid-3 { grid-template-columns: 1fr; }
+    .participants { grid-template-columns: 1fr 1fr; }
+    .icon-states { grid-template-columns: repeat(3, 1fr); }
+    .palette { grid-template-columns: repeat(4, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Reusable SVG icons -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>
+    </symbol>
+    <symbol id="i-mic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="4" y1="4" x2="20" y2="20"/><path d="M9 9v5a3 3 0 0 0 5.12 2.12"/><path d="M15 9.34V6a3 3 0 0 0-5.94-.6"/><path d="M19 11a7 7 0 0 1-.45 2.5"/><path d="M12 18v3"/>
+    </symbol>
+    <symbol id="i-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7h12v10H3z"/><path d="m21 8-6 4 6 4V8z"/>
+    </symbol>
+    <symbol id="i-cam-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="4" y1="4" x2="20" y2="20"/><path d="M16 16v1H3V7h6"/><path d="M21 8v8l-6-4 6-4z"/>
+    </symbol>
+    <symbol id="i-screen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>
+    </symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12a8 8 0 0 1-12 7l-5 1 1-5a8 8 0 1 1 16-3z"/>
+    </symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </symbol>
+    <symbol id="i-hangup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 12.6a16 16 0 0 0-20 0l1.7 2.7a2 2 0 0 0 2.5.7l2.4-1a2 2 0 0 0 1.2-2l-.3-2.3a14 14 0 0 1 4.8 0L13.7 13a2 2 0 0 0 1.2 2l2.4 1a2 2 0 0 0 2.5-.7z"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+    </symbol>
+    <symbol id="i-mic-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="frame">
+
+  <!-- =========================================== -->
+  <!-- TOP BAR                                      -->
+  <!-- =========================================== -->
+  <header class="topbar">
+    <div class="logo">Voicechat<span class="sub">VELVET ONYX</span></div>
+    <nav>
+      <a>Rooms</a>
+      <a>Devices</a>
+      <a class="active">Appearance</a>
+      <a>About</a>
+    </nav>
+  </header>
+
+  <!-- =========================================== -->
+  <!-- HERO                                         -->
+  <!-- =========================================== -->
+  <section class="hero">
+    <div class="hero-eyebrow">Theme № 03 · Luxury concept</div>
+    <h1>Velvet Onyx</h1>
+    <p>The same zinc palette voicechat already uses, lifted with soft pearl light, drifting halos and subtle glass. Built on the existing color tokens — no foreign hues, no italic, no decoration that gets in the way of the call.</p>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- 1 · CALL BAR (icon buttons in context)       -->
+  <!-- =========================================== -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Call bar</h2>
+      <span class="id">§ 01 · ICON BUTTONS IN CONTEXT</span>
+    </div>
+
+    <div class="callbar-wrap">
+      <div class="callbar">
+        <button class="icon-btn lg" title="Toggle mic">
+          <svg><use href="#i-mic"/></svg>
+        </button>
+        <button class="icon-btn lg muted" title="Mic muted">
+          <svg><use href="#i-mic-off"/></svg>
+        </button>
+        <button class="icon-btn lg" title="Toggle camera">
+          <svg><use href="#i-cam"/></svg>
+        </button>
+        <button class="icon-btn lg active" title="Screen share active">
+          <svg><use href="#i-screen"/></svg>
+        </button>
+        <span class="callbar-sep"></span>
+        <button class="icon-btn lg" title="Chat">
+          <svg><use href="#i-chat"/></svg>
+        </button>
+        <button class="icon-btn lg" title="Participants">
+          <svg><use href="#i-users"/></svg>
+        </button>
+        <button class="icon-btn lg" title="Settings">
+          <svg><use href="#i-settings"/></svg>
+        </button>
+        <span class="callbar-sep"></span>
+        <button class="icon-btn lg hangup" title="Leave">
+          <svg><use href="#i-hangup"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="callbar-caption">Floating glass bar · drop shadow · inner highlight</div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- 2 · ICON BUTTON STATE TABLE                  -->
+  <!-- =========================================== -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Icon button states</h2>
+      <span class="id">§ 02 · DEFAULT · HOVER · ACTIVE · MUTED · DESTRUCT · DISABLED</span>
+    </div>
+
+    <div class="icon-states">
+      <div class="icon-state">
+        <button class="icon-btn"><svg><use href="#i-mic"/></svg></button>
+        <span class="lbl">Default</span>
+      </div>
+      <div class="icon-state">
+        <button class="icon-btn" style="color: var(--fg); background: linear-gradient(180deg, hsla(240,10%,28%,0.7), hsla(240,8%,14%,0.7)); border-color: var(--hair-strong);"><svg><use href="#i-mic"/></svg></button>
+        <span class="lbl">Hover</span>
+      </div>
+      <div class="icon-state">
+        <button class="icon-btn active"><svg><use href="#i-mic"/></svg></button>
+        <span class="lbl">Active / On</span>
+      </div>
+      <div class="icon-state">
+        <button class="icon-btn muted"><svg><use href="#i-mic-off"/></svg></button>
+        <span class="lbl">Muted</span>
+      </div>
+      <div class="icon-state">
+        <button class="icon-btn hangup"><svg><use href="#i-hangup"/></svg></button>
+        <span class="lbl">Destructive</span>
+      </div>
+      <div class="icon-state">
+        <button class="icon-btn" style="opacity:0.35; pointer-events:none;"><svg><use href="#i-mic"/></svg></button>
+        <span class="lbl">Disabled</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- 3 · BUTTONS                                  -->
+  <!-- =========================================== -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Buttons</h2>
+      <span class="id">§ 03 · VARIANTS &amp; SIZES</span>
+    </div>
+
+    <div class="glass p-lg">
+      <div class="col" style="gap: 24px;">
+
+        <div class="row gap-lg">
+          <button class="btn btn-primary">Join call</button>
+          <button class="btn btn-secondary">Cancel</button>
+          <button class="btn btn-ghost">Learn more</button>
+          <button class="btn btn-destructive">Leave room</button>
+          <button class="btn btn-primary" disabled>Disabled</button>
+        </div>
+
+        <div class="row gap-lg">
+          <button class="btn btn-primary btn-sm">Small</button>
+          <button class="btn btn-primary">Default</button>
+          <button class="btn btn-primary btn-lg">Large</button>
+        </div>
+
+        <div class="row gap-lg">
+          <button class="btn btn-primary"><svg><use href="#i-plus"/></svg>Create room</button>
+          <button class="btn btn-secondary">Continue<svg><use href="#i-arrow"/></svg></button>
+          <button class="btn btn-ghost"><svg><use href="#i-settings"/></svg>Settings</button>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- 4 · INPUTS                                   -->
+  <!-- =========================================== -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Inputs &amp; forms</h2>
+      <span class="id">§ 04 · TEXT · SELECT · TEXTAREA</span>
+    </div>
+
+    <div class="grid-2">
+      <div class="glass p-lg">
+        <div class="col">
+
+          <div class="field">
+            <label class="field-label">Room name</label>
+            <input class="input" type="text" value="Studio · Wednesday review" />
+          </div>
+
+          <div class="field">
+            <label class="field-label">Server URL</label>
+            <input class="input" type="text" placeholder="wss://livekit.your-domain.com" />
+            <span class="field-hint">SFU endpoint — leave empty to use lobby default.</span>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Display name</label>
+            <input class="input" type="text" value="" aria-invalid="true" />
+            <span class="field-err">Display name cannot be empty.</span>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Search participants</label>
+            <div class="input-wrap">
+              <svg class="leading"><use href="#i-search"/></svg>
+              <input class="input" type="text" placeholder="Filter by name or role…" />
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="glass p-lg">
+        <div class="col">
+
+          <div class="field">
+            <label class="field-label">Input device</label>
+            <select class="input">
+              <option>Shure SM7B (USB)</option>
+              <option>MacBook Pro Microphone</option>
+              <option>AirPods Pro</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Output device</label>
+            <select class="input">
+              <option>Studio Monitors L+R</option>
+              <option>System default</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="field-label">About this room</label>
+            <textarea class="input" placeholder="Optional — visible to invited members.">Internal weekly. Audio only. Sessions are not recorded.</textarea>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Disabled</label>
+            <input class="input" type="text" value="Locked by host" disabled />
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- 5 · TOGGLES, CHECKBOXES, TABS, SLIDER        -->
+  <!-- =========================================== -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Controls</h2>
+      <span class="id">§ 05 · SWITCH · CHECK · RADIO · SLIDER · TABS</span>
+    </div>
+
+    <div class="grid-2">
+
+      <div class="glass settings-card">
+        <div class="pref-row">
+          <div>
+            <span class="pref-key">Noise suppression</span>
+            <span class="pref-desc">RNN model · removes keyboard &amp; fan noise</span>
+          </div>
+          <span class="switch on"></span>
+        </div>
+        <div class="pref-row">
+          <div>
+            <span class="pref-key">Echo cancellation</span>
+            <span class="pref-desc">Recommended when using speakers</span>
+          </div>
+          <span class="switch on"></span>
+        </div>
+        <div class="pref-row">
+          <div>
+            <span class="pref-key">Push to talk</span>
+            <span class="pref-desc">Hold ⌥+Space to transmit</span>
+          </div>
+          <span class="switch"></span>
+        </div>
+        <div class="pref-row">
+          <div>
+            <span class="pref-key">Auto-gain</span>
+            <span class="pref-desc">−6 dB headroom · disabled by default</span>
+          </div>
+          <span class="switch"></span>
+        </div>
+        <div class="pref-row">
+          <div>
+            <span class="pref-key">Input gain</span>
+            <span class="pref-desc">Currently 64%</span>
+          </div>
+          <div style="width: 180px;">
+            <div class="slider"><div class="slider-fill"></div><div class="slider-knob"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass p-lg">
+        <div class="col" style="gap: 24px;">
+
+          <div>
+            <span class="field-label" style="display:block; margin-bottom: 12px;">Audio profile</span>
+            <div class="tabs">
+              <div class="tab">Voice</div>
+              <div class="tab active">Music</div>
+              <div class="tab">Stage</div>
+            </div>
+          </div>
+
+          <div>
+            <span class="field-label" style="display:block; margin-bottom: 12px;">Codec</span>
+            <div class="col" style="gap: 10px;">
+              <label class="row" style="cursor:pointer;">
+                <span class="radio on"></span><span style="font-size:14px;">Opus &mdash; 192 kbps</span>
+              </label>
+              <label class="row" style="cursor:pointer;">
+                <span class="radio"></span><span style="font-size:14px;">Opus &mdash; 96 kbps</span>
+              </label>
+              <label class="row" style="cursor:pointer;">
+                <span class="radio"></span><span style="font-size:14px;">AAC &mdash; 256 kbps</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <span class="field-label" style="display:block; margin-bottom: 12px;">Extras</span>
+            <div class="col" style="gap: 10px;">
+              <label class="row" style="cursor:pointer;">
+                <span class="check on"></span><span style="font-size:14px;">Show speaking glow</span>
+              </label>
+              <label class="row" style="cursor:pointer;">
+                <span class="check on"></span><span style="font-size:14px;">Animate avatars</span>
+              </label>
+              <label class="row" style="cursor:pointer;">
+                <span class="check"></span><span style="font-size:14px;">Reduce motion</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="row gap-lg" style="margin-top: 4px;">
+            <span class="badge live">LIVE · 4 PEERS</span>
+            <span class="badge">OPUS · 192</span>
+            <span class="badge warn">RTT 84ms</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- 6 · PARTICIPANT TILES                        -->
+  <!-- =========================================== -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Participant tiles</h2>
+      <span class="id">§ 06 · IDLE · SPEAKING · MUTED</span>
+    </div>
+
+    <div class="participants">
+      <div class="tile">
+        <div class="tile-avatar"></div>
+        <div class="tile-foot">
+          <span class="tile-name">Nikita</span>
+          <span class="tile-mic"><svg width="12" height="12"><use href="#i-mic-small"/></svg></span>
+        </div>
+      </div>
+      <div class="tile speaking">
+        <div class="tile-avatar"></div>
+        <div class="tile-foot">
+          <span class="tile-name">Lena Petrova</span>
+          <span class="tile-mic"><svg width="12" height="12"><use href="#i-mic-small"/></svg></span>
+        </div>
+      </div>
+      <div class="tile">
+        <div class="tile-avatar"></div>
+        <div class="tile-foot">
+          <span class="tile-name">Aaron K.</span>
+          <span class="tile-mic muted"><svg width="12" height="12"><use href="#i-mic-off"/></svg></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- 7 · TOASTS & NOTIFICATIONS                   -->
+  <!-- =========================================== -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Toasts</h2>
+      <span class="id">§ 07 · INFO · WARN</span>
+    </div>
+
+    <div class="col" style="gap: 12px; max-width: 420px;">
+      <div class="toast">
+        <span class="toast-dot"></span>
+        <div class="toast-body">
+          <div class="toast-title">Lena joined the room</div>
+          <div class="toast-sub">3 participants &middot; 22 ms RTT</div>
+        </div>
+        <button class="icon-btn sm"><svg><use href="#i-x"/></svg></button>
+      </div>
+      <div class="toast">
+        <span class="toast-dot" style="background: hsl(40 80% 60%); box-shadow: 0 0 12px hsla(40, 80%, 60%, 0.7);"></span>
+        <div class="toast-body">
+          <div class="toast-title">High jitter detected</div>
+          <div class="toast-sub">Consider switching to wired network.</div>
+        </div>
+        <button class="icon-btn sm"><svg><use href="#i-x"/></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- 8 · PALETTE                                  -->
+  <!-- =========================================== -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Palette</h2>
+      <span class="id">§ 08 · MAPPED TO TAILWIND TOKENS</span>
+    </div>
+
+    <div class="palette">
+      <div class="swatch" style="background:linear-gradient(160deg,hsl(240 12% 3%),hsl(240 10% 4%));">
+        <div class="swatch-name">bg</div>
+        <div class="swatch-hex">240 10% 4%</div>
+      </div>
+      <div class="swatch" style="background:linear-gradient(160deg,hsl(240 6% 10%),hsl(240 6% 6%));">
+        <div class="swatch-name">bg-elevated</div>
+        <div class="swatch-hex">240 6% 10%</div>
+      </div>
+      <div class="swatch" style="background:linear-gradient(160deg,hsl(240 4% 14%),hsl(240 4% 10%));">
+        <div class="swatch-name">bg-muted</div>
+        <div class="swatch-hex">240 4% 14%</div>
+      </div>
+      <div class="swatch" style="background:hsl(240 4% 16%);">
+        <div class="swatch-name">border</div>
+        <div class="swatch-hex">240 4% 16%</div>
+      </div>
+      <div class="swatch" style="background:linear-gradient(160deg,hsl(240 8% 78%),hsl(240 6% 48%));">
+        <div class="swatch-name light">halo</div>
+        <div class="swatch-hex light">240 8% 78%</div>
+      </div>
+      <div class="swatch light" style="background:linear-gradient(160deg,hsl(240 6% 98%),hsl(240 6% 82%));">
+        <div class="swatch-name">fg / pearl</div>
+        <div class="swatch-hex">0 0% 98%</div>
+      </div>
+      <div class="swatch" style="background:linear-gradient(160deg,hsl(346 77% 49%),hsl(346 70% 36%));">
+        <div class="swatch-name">destructive</div>
+        <div class="swatch-hex">346 77% 49%</div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <span>Velvet Onyx · Theme № 03</span>
+    <a href="./index.html">← Back to gallery</a>
+  </footer>
+
+</div>
+</body>
+</html>

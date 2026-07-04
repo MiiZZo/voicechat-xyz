@@ -1,0 +1,2188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Room · Velvet Onyx · Voicechat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     ROOM VIEW — Velvet Onyx applied to the actual app layout
+     Mirrors apps/client/src/renderer/views/RoomView.tsx:
+       <TitleBar/>
+       <main> <participants/> <ChatPanel/> </main>
+       <ControlBar/>
+       <ToastTray/>
+     ============================================================ */
+  :root {
+    --bg:           hsl(240 10% 4%);
+    --bg-elevated:  hsl(240 6% 10%);
+    --bg-muted:     hsl(240 4% 14%);
+    --border:       hsl(240 4% 16%);
+    --fg:           hsl(0 0% 98%);
+    --fg-muted:     hsl(240 5% 65%);
+    --fg-subtle:    hsl(240 4% 46%);
+    --destructive:  hsl(346 77% 49%);
+
+    --bg-deep:      hsl(240 12% 3%);
+    --pearl:        hsl(240 8% 92%);
+    --pearl-soft:   hsl(240 6% 70%);
+    --halo-glow:    hsla(240, 12%, 80%, 0.18);
+
+    --glass:        hsla(240, 8%, 70%, 0.04);
+    --glass-2:      hsla(240, 8%, 70%, 0.06);
+    --glass-bd:     hsla(240, 8%, 90%, 0.08);
+    --glass-bd-2:   hsla(240, 8%, 90%, 0.14);
+
+    --hair:         hsla(0, 0%, 100%, 0.05);
+    --hair-strong:  hsla(0, 0%, 100%, 0.10);
+
+    --r-sm: 4px;
+    --r-md: 6.4px;
+    --r-lg: 10px;
+    --r-2xl: 16px;
+    --r-pill: 999px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* Drifting halo — exactly as in the standalone Velvet Onyx concept */
+  body::before {
+    content: '';
+    position: fixed;
+    width: 70vmax; height: 70vmax;
+    top: -25vmax; left: -25vmax;
+    background: radial-gradient(circle at center, hsla(240, 10%, 70%, 0.08) 0%, transparent 50%);
+    filter: blur(60px);
+    pointer-events: none;
+    animation: drift 24s ease-in-out infinite alternate;
+    z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/></svg>");
+  }
+  @keyframes drift {
+    0%   { transform: translate(0, 0) scale(1); }
+    100% { transform: translate(22vmax, 10vmax) scale(1.18); }
+  }
+
+  /* ============================================================
+     APP CHROME — full viewport, matches RoomView.tsx
+     <div className="flex h-screen flex-col bg-bg text-fg">
+     ============================================================ */
+  .app {
+    --chat-w: 320px;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background:
+      radial-gradient(ellipse 55% 45% at 18% 8%,  hsla(240, 10%, 70%, 0.10), transparent 60%),
+      radial-gradient(ellipse 60% 45% at 90% 18%, hsla(240,  8%, 78%, 0.05), transparent 65%),
+      radial-gradient(ellipse 80% 55% at 50% 115%, hsla(240, 10%, 60%, 0.08), transparent 65%),
+      linear-gradient(180deg, var(--bg-deep) 0%, var(--bg) 50%, var(--bg-deep) 100%);
+  }
+
+  /* ============================================================
+     TITLEBAR — matches TitleBar.tsx + RoomView header content
+     ============================================================ */
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px 6px 12px;
+    height: 36px;
+    background: hsla(240, 10%, 6%, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    position: relative;
+    -webkit-app-region: drag;
+    user-select: none;
+  }
+  .titlebar::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 24px; right: 24px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--hair), transparent);
+  }
+  .titlebar > * { -webkit-app-region: no-drag; }
+
+  .room-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 6px;
+    border-radius: var(--r-md);
+    color: var(--fg);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: 'Geist', sans-serif;
+    transition: 0.2s ease;
+  }
+  .room-pill:hover { background: var(--glass-2); }
+  .room-pill svg { width: 14px; height: 14px; color: var(--fg-muted); }
+  .room-pill .name { font-size: 13px; font-weight: 500; }
+  .room-pill .count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--fg-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .titlebar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .quality {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: var(--r-md);
+    color: var(--fg-muted);
+    cursor: default;
+  }
+  .quality:hover { background: hsla(240, 4%, 14%, 0.5); }
+  .quality-bars { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+  .quality-bars span {
+    display: inline-block;
+    width: 2.5px;
+    background: var(--pearl-soft);
+    border-radius: 1px;
+  }
+  .quality-bars span:nth-child(1) { height: 4px; }
+  .quality-bars span:nth-child(2) { height: 7px; }
+  .quality-bars span:nth-child(3) { height: 10px; }
+  .quality-bars span.dim { background: var(--fg-subtle); opacity: 0.4; }
+  .quality .rtt {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .conn-state {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+
+  .icon-btn-titlebar {
+    width: 28px; height: 28px;
+    border-radius: var(--r-md);
+    background: transparent;
+    border: none;
+    color: var(--fg-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s ease;
+  }
+  .icon-btn-titlebar:hover { background: var(--glass-2); color: var(--fg); }
+  .icon-btn-titlebar svg { width: 14px; height: 14px; }
+
+  /* ============================================================
+     MAIN — participants + chat
+     <main className="flex flex-1 overflow-hidden">
+     ============================================================ */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ===== Participants section ===== */
+  .stage {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 20px 88px;  /* bottom space for the floating ControlBar */
+  }
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  @media (min-width: 1180px) {
+    .tiles { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  .tile {
+    aspect-ratio: 4/3;
+    border-radius: var(--r-lg);
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 40%, hsla(240, 8%, 18%, 0.6), transparent 70%),
+      linear-gradient(160deg, var(--bg-elevated) 0%, var(--bg-deep) 100%);
+    border: 1px solid var(--glass-bd);
+    position: relative;
+    overflow: hidden;
+    transition: 0.3s ease;
+  }
+  .tile.speaking {
+    border-color: hsla(240, 12%, 90%, 0.30);
+  }
+  .tile.speaking::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--r-lg);
+    pointer-events: none;
+    animation: speakingPulse 1.6s ease-out infinite;
+  }
+  @keyframes speakingPulse {
+    0%, 100% { box-shadow: inset 0 0 0 0 hsla(240, 12%, 90%, 0.0); }
+    50% { box-shadow: inset 0 0 0 2px hsla(240, 12%, 90%, 0.25); }
+  }
+
+  .tile-avatar {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, calc(-50% - 8px));
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--bg);
+    font-weight: 500;
+    font-size: 22px;
+    letter-spacing: 0.01em;
+    box-shadow:
+      0 0 32px hsla(240, 10%, 70%, 0.10),
+      inset 0 -6px 14px rgba(0,0,0,0.4),
+      inset 0 2px 6px rgba(255,255,255,0.10);
+  }
+  .tile-avatar.a-nikita { background: radial-gradient(circle at 35% 30%, hsl(240 8% 88%) 0%, hsl(240 6% 56%) 100%); }
+  .tile-avatar.a-lena   { background: radial-gradient(circle at 35% 30%, hsl(220 12% 78%) 0%, hsl(220 8% 44%) 100%); }
+  .tile-avatar.a-aaron  { background: radial-gradient(circle at 35% 30%, hsl(260 6% 76%) 0%, hsl(260 4% 40%) 100%); }
+  .tile-avatar.a-marie  { background: radial-gradient(circle at 35% 30%, hsl(200 10% 76%) 0%, hsl(200 6% 42%) 100%); }
+  .tile-avatar.a-tom    { background: radial-gradient(circle at 35% 30%, hsl(180 6% 76%) 0%, hsl(180 4% 38%) 100%); color: hsl(180 4% 16%); }
+  .tile-avatar.a-empty  {
+    background:
+      radial-gradient(circle at 35% 30%, hsl(240 6% 28%) 0%, hsl(240 8% 12%) 100%);
+    color: var(--fg-subtle);
+  }
+
+  /* Video tile (camera on) — fake feed via gradient */
+  .tile.has-video {
+    background:
+      linear-gradient(160deg, hsl(240 8% 18%) 0%, hsl(240 12% 6%) 100%);
+  }
+  .tile.has-video::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 35%, hsla(240, 6%, 32%, 0.7), transparent 70%),
+      radial-gradient(ellipse 40% 30% at 70% 70%, hsla(220, 4%, 24%, 0.6), transparent 60%);
+  }
+  .tile.has-video .tile-avatar { display: none; }
+  .tile.has-video .fake-silhouette {
+    position: absolute;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 70%;
+    background:
+      radial-gradient(ellipse 50% 35% at 50% 18%, hsl(240 8% 36%) 0%, transparent 60%),
+      radial-gradient(ellipse 80% 70% at 50% 100%, hsl(240 10% 24%) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .tile-foot {
+    position: absolute;
+    bottom: 8px; left: 8px; right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .tile-name {
+    font-size: 12px;
+    color: var(--fg);
+    font-weight: 500;
+    background: hsla(240, 10%, 4%, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 3px 8px;
+    border-radius: var(--r-sm);
+    max-width: 70%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tile-name .you {
+    color: var(--fg-subtle);
+    font-weight: 400;
+    margin-left: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .tile-mic {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: hsla(240, 10%, 4%, 0.55);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--fg);
+    flex-shrink: 0;
+  }
+  .tile-mic svg { width: 12px; height: 12px; }
+  .tile-mic.muted { color: var(--destructive); }
+  .tile-mic.transmitting { background: linear-gradient(180deg, hsl(240 6% 96%), hsl(240 6% 78%)); color: var(--bg); }
+
+  .tile-quality {
+    position: absolute;
+    top: 8px; left: 8px;
+    background: hsla(240, 10%, 4%, 0.55);
+    backdrop-filter: blur(8px);
+    padding: 3px 6px;
+    border-radius: var(--r-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .tile-quality .bars {
+    display: inline-flex; gap: 1.5px; align-items: flex-end; height: 9px;
+  }
+  .tile-quality .bars span {
+    width: 2px;
+    background: var(--pearl-soft);
+    border-radius: 0.5px;
+  }
+  .tile-quality .bars span:nth-child(1) { height: 3px; }
+  .tile-quality .bars span:nth-child(2) { height: 5px; }
+  .tile-quality .bars span:nth-child(3) { height: 7px; }
+  .tile-quality .bars span.dim { background: var(--fg-subtle); opacity: 0.4; }
+
+  /* ============================================================
+     CHAT PANEL — w-80 (320px), border-l, bg-bg-elevated/30
+     ============================================================ */
+  .chat {
+    width: 320px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background:
+      linear-gradient(180deg, hsla(240, 6%, 10%, 0.35) 0%, hsla(240, 6%, 8%, 0.35) 100%);
+    backdrop-filter: blur(20px) saturate(120%);
+    -webkit-backdrop-filter: blur(20px) saturate(120%);
+  }
+  .chat::before {
+    content: '';
+    position: absolute;
+    top: 24px; bottom: 24px; left: 0;
+    width: 1px;
+    background: linear-gradient(180deg, transparent 0%, var(--hair-strong) 20%, var(--hair-strong) 80%, transparent 100%);
+    pointer-events: none;
+  }
+
+  .chat-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 14px 18px 12px;
+    position: relative;
+  }
+  .chat-head::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 18px; right: 18px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--hair-strong), transparent);
+  }
+  .chat-head .title { font-size: 14px; font-weight: 600; color: var(--fg); letter-spacing: -0.005em; }
+  .chat-head .live {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+  .chat-head .live::before {
+    content: '';
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: hsl(140 60% 55%);
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+    box-shadow: 0 0 6px hsl(140 60% 55%);
+  }
+
+  .chat-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .msg { display: flex; gap: 10px; min-width: 0; }
+  .msg.local { flex-direction: row-reverse; }
+
+  .msg-avatar {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--bg);
+    font-size: 10px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .msg-avatar.a-lena   { background: radial-gradient(circle at 35% 30%, hsl(220 12% 78%) 0%, hsl(220 8% 44%) 100%); }
+  .msg-avatar.a-aaron  { background: radial-gradient(circle at 35% 30%, hsl(260 6% 76%) 0%, hsl(260 4% 40%) 100%); }
+  .msg-avatar.a-nikita { background: radial-gradient(circle at 35% 30%, hsl(240 8% 88%) 0%, hsl(240 6% 56%) 100%); }
+  .msg-avatar.a-marie  { background: radial-gradient(circle at 35% 30%, hsl(200 10% 76%) 0%, hsl(200 6% 42%) 100%); }
+
+  .msg-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    max-width: calc(100% - 2.5rem);
+  }
+  .msg.local .msg-body { align-items: flex-end; }
+  .msg-from {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+    padding: 0 2px;
+  }
+
+  .bubble {
+    max-width: 100%;
+    background: var(--glass-2);
+    border: 1px solid var(--glass-bd);
+    border-radius: var(--r-2xl);
+    padding: 9px 13px;
+    font-size: 13px;
+    color: var(--fg);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    box-shadow:
+      0 1px 0 hsla(0, 0%, 100%, 0.04) inset,
+      0 4px 16px -8px rgba(0, 0, 0, 0.4);
+    position: relative;
+  }
+  .msg:not(.local) .bubble { border-top-left-radius: var(--r-sm); }
+
+  .msg.local .bubble {
+    border-top-right-radius: var(--r-sm);
+    background: linear-gradient(180deg, hsl(240 6% 96%) 0%, hsl(240 6% 80%) 100%);
+    border-color: transparent;
+    color: var(--bg);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.5) inset,
+      0 6px 20px -10px var(--halo-glow);
+  }
+  .msg.local .bubble a {
+    color: var(--bg);
+    text-decoration-color: hsla(240, 10%, 4%, 0.4);
+  }
+
+  .bubble a {
+    color: var(--fg);
+    text-decoration: underline;
+    text-decoration-color: var(--fg-subtle);
+    text-underline-offset: 2px;
+    transition: 0.2s ease;
+  }
+  .bubble a:hover {
+    text-decoration-color: currentColor;
+  }
+
+  /* File bubble */
+  .file-bubble {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--glass-2);
+    border: 1px solid var(--glass-bd);
+    border-radius: var(--r-2xl);
+    padding: 9px 12px;
+    max-width: 100%;
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    box-shadow:
+      0 1px 0 hsla(0, 0%, 100%, 0.04) inset,
+      0 4px 16px -8px rgba(0, 0, 0, 0.4);
+  }
+  .msg:not(.local) .file-bubble { border-top-left-radius: var(--r-sm); }
+  .msg.local .file-bubble { border-top-right-radius: var(--r-sm); }
+  /* Luxury file icon: small glass plaque with mono-typed extension chip */
+  .file-icon {
+    width: 38px; height: 46px;
+    flex-shrink: 0;
+    background:
+      linear-gradient(160deg, hsla(240, 6%, 26%, 0.5) 0%, hsla(240, 8%, 12%, 0.4) 100%);
+    border: 1px solid var(--glass-bd);
+    border-radius: var(--r-sm);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    position: relative;
+    box-shadow:
+      inset 0 1px 0 hsla(0, 0%, 100%, 0.06),
+      0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+  .file-icon::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 8px; height: 8px;
+    background:
+      linear-gradient(225deg, hsla(240, 8%, 18%, 0.9) 0%, hsla(240, 8%, 18%, 0.9) 50%, transparent 50%);
+    border-bottom-left-radius: 2px;
+  }
+  .file-icon-glyph {
+    width: 14px; height: 14px;
+    color: var(--fg-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .file-icon-glyph svg { width: 100%; height: 100%; }
+  .file-icon-ext {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    color: var(--fg-subtle);
+    text-transform: uppercase;
+  }
+  /* Local file-bubble (your message) — invert glyph colors over pearl bg */
+  .msg.local .file-icon {
+    background: linear-gradient(160deg, hsla(240, 8%, 22%, 0.18) 0%, hsla(240, 10%, 8%, 0.10) 100%);
+    border-color: hsla(240, 10%, 4%, 0.15);
+    box-shadow:
+      inset 0 1px 0 hsla(0, 0%, 100%, 0.20),
+      0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  .msg.local .file-icon-glyph { color: hsla(240, 10%, 4%, 0.7); }
+  .msg.local .file-icon-ext { color: hsla(240, 10%, 4%, 0.5); }
+
+  .file-info { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 2px; }
+  .file-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    letter-spacing: -0.005em;
+  }
+  .file-meta {
+    font-size: 11px;
+    color: var(--fg-subtle);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.04em;
+  }
+  .msg.local .file-meta { color: hsla(240, 10%, 4%, 0.55); }
+
+  .file-dl {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: hsla(0, 0%, 100%, 0.06);
+    border: 1px solid hsla(0, 0%, 100%, 0.08);
+    color: var(--fg-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: 0.2s ease;
+  }
+  .file-dl:hover {
+    background: hsla(0, 0%, 100%, 0.1);
+    color: var(--fg);
+    border-color: var(--glass-bd-2);
+  }
+  .file-dl svg { width: 13px; height: 13px; }
+  .msg.local .file-dl {
+    background: hsla(240, 10%, 4%, 0.12);
+    border-color: hsla(240, 10%, 4%, 0.15);
+    color: hsla(240, 10%, 4%, 0.7);
+  }
+  .msg.local .file-dl:hover {
+    background: hsla(240, 10%, 4%, 0.2);
+    color: var(--bg);
+  }
+
+  /* Image bubble */
+  .img-bubble {
+    overflow: hidden;
+    border: 1px solid var(--glass-bd);
+    border-radius: var(--r-2xl);
+    background: var(--glass-2);
+    max-width: 100%;
+    box-shadow:
+      0 1px 0 hsla(0, 0%, 100%, 0.04) inset,
+      0 4px 16px -8px rgba(0, 0, 0, 0.4);
+  }
+  .msg:not(.local) .img-bubble { border-top-left-radius: var(--r-sm); }
+  .msg.local .img-bubble { border-top-right-radius: var(--r-sm); }
+  /* Fake photo preview — moody neutral, looks like a real architectural / product shot */
+  .img-bubble .img-fake {
+    height: 150px;
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 75% 60% at 72% 28%, hsl(240 8% 42%) 0%, hsl(240 10% 22%) 45%, hsl(240 14% 8%) 100%);
+  }
+  .img-bubble .img-fake::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 35% 25% at 22% 18%, hsla(0, 0%, 100%, 0.14), transparent 65%),
+      radial-gradient(ellipse 18% 14% at 62% 75%, hsla(240, 8%, 80%, 0.10), transparent 60%);
+    pointer-events: none;
+  }
+  .img-bubble .img-fake::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, transparent 60%, hsla(240, 14%, 4%, 0.45) 100%);
+    pointer-events: none;
+  }
+  .img-meta {
+    position: absolute;
+    bottom: 8px; left: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: hsla(0, 0%, 100%, 0.75);
+    letter-spacing: 0.04em;
+  }
+  .img-meta svg { width: 10px; height: 10px; opacity: 0.7; }
+
+  /* Chat input */
+  .chat-form {
+    padding: 12px 14px 14px;
+    position: relative;
+  }
+  .chat-form::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 18px; right: 18px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--hair-strong), transparent);
+  }
+  .chat-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .chat-attach {
+    position: absolute;
+    left: 4px;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--fg-muted);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: 0.2s ease;
+  }
+  .chat-attach:hover { background: var(--bg-muted); color: var(--fg); }
+  .chat-attach svg { width: 14px; height: 14px; }
+
+  .chat-input {
+    flex: 1;
+    height: 40px;
+    background: var(--glass-2);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid var(--glass-bd);
+    border-radius: var(--r-pill);
+    padding: 0 44px 0 40px;
+    color: var(--fg);
+    font-family: 'Geist', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow:
+      0 1px 0 hsla(0, 0%, 100%, 0.04) inset,
+      0 4px 14px -8px rgba(0, 0, 0, 0.4);
+  }
+  .chat-input::placeholder { color: var(--fg-subtle); }
+  .chat-input:hover { border-color: var(--glass-bd-2); }
+  .chat-input:focus {
+    border-color: hsla(240, 10%, 92%, 0.25);
+    box-shadow:
+      0 0 0 3px hsla(240, 10%, 80%, 0.08),
+      0 1px 0 hsla(0, 0%, 100%, 0.06) inset,
+      0 6px 20px -8px var(--halo-glow);
+  }
+
+  .chat-send {
+    position: absolute;
+    right: 4px;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(180deg, hsl(240 6% 98%), hsl(240 6% 82%));
+    color: var(--bg);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: 0.2s ease;
+    box-shadow: 0 2px 8px -2px var(--halo-glow);
+  }
+  .chat-send:hover { background: linear-gradient(180deg, hsl(240 6% 100%), hsl(240 6% 86%)); }
+  .chat-send svg { width: 14px; height: 14px; }
+  .chat-send:disabled {
+    background: var(--bg-muted);
+    color: var(--fg-subtle);
+    cursor: default;
+    box-shadow: none;
+  }
+
+  /* ============================================================
+     CONTROL BAR — floating island
+     ============================================================ */
+  .controlbar {
+    position: absolute;
+    bottom: 18px;
+    left: calc((100% - var(--chat-w)) / 2);
+    transform: translateX(-50%);
+    z-index: 5;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    border-radius: var(--r-pill);
+
+    background: hsla(240, 6%, 8%, 0.72);
+    backdrop-filter: blur(32px) saturate(160%);
+    -webkit-backdrop-filter: blur(32px) saturate(160%);
+    border: 1px solid var(--glass-bd-2);
+    box-shadow:
+      0 24px 60px -20px rgba(0, 0, 0, 0.65),
+      0 1px 0 hsla(240, 10%, 92%, 0.08) inset,
+      0 -8px 24px -16px hsla(240, 12%, 80%, 0.10) inset;
+  }
+  .controlbar::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: var(--r-pill);
+    padding: 1px;
+    background: linear-gradient(135deg, hsla(240, 10%, 92%, 0.20), hsla(240, 10%, 92%, 0.02) 50%, transparent 80%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Round icon button (ToolButton in ControlBar.tsx) */
+  .tool {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    background:
+      linear-gradient(180deg, hsla(240, 6%, 22%, 0.5) 0%, hsla(240, 6%, 10%, 0.5) 100%);
+    color: var(--fg-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    position: relative;
+  }
+  .tool:hover {
+    color: var(--fg);
+    background: linear-gradient(180deg, hsla(240, 10%, 28%, 0.6) 0%, hsla(240, 8%, 14%, 0.6) 100%);
+  }
+  .tool svg { width: 16px; height: 16px; }
+
+  /* variant="accent" — transmitting / cam on */
+  .tool.accent {
+    color: var(--bg);
+    background: linear-gradient(180deg, hsl(240 6% 98%) 0%, hsl(240 6% 80%) 100%);
+    border-color: transparent;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.45) inset,
+      0 6px 20px -6px var(--halo-glow);
+  }
+  .tool.accent:hover {
+    background: linear-gradient(180deg, hsl(240 6% 100%) 0%, hsl(240 6% 86%) 100%);
+  }
+
+  /* mutedStyle — rose tint */
+  .tool.muted-style { color: hsl(346 80% 78%); }
+  .tool.muted-style:hover { color: hsl(346 90% 86%); }
+
+  .tool[disabled] { opacity: 0.4; pointer-events: none; }
+
+  /* Hair separator inside the island — barely visible */
+  .ctrl-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--hair-strong);
+    margin: 0 4px;
+  }
+
+  /* "Выйти" — destructive variant — compact pill matching tool sizing */
+  .btn-leave {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px;
+    height: 40px;
+    border-radius: var(--r-pill);
+    border: none;
+    background: linear-gradient(180deg, hsl(346 77% 49%) 0%, hsl(346 70% 36%) 100%);
+    color: var(--fg);
+    font-family: 'Geist', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.2s ease;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.25) inset,
+      0 4px 14px -6px hsla(346, 77%, 49%, 0.6);
+  }
+  .btn-leave:hover {
+    background: linear-gradient(180deg, hsl(346 80% 54%) 0%, hsl(346 70% 40%) 100%);
+  }
+  .btn-leave svg { width: 14px; height: 14px; }
+
+  /* ============================================================
+     TOAST — floating bottom-right
+     ============================================================ */
+  .toast-tray {
+    position: fixed;
+    bottom: 88px;
+    left: 16px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+  @keyframes toastInLeft {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    background: hsla(240, 6%, 10%, 0.85);
+    backdrop-filter: blur(28px) saturate(140%);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
+    border: 1px solid var(--glass-bd);
+    box-shadow:
+      0 16px 48px -16px rgba(0,0,0,0.8),
+      inset 0 1px 0 hsla(240, 10%, 92%, 0.06);
+    max-width: 340px;
+    animation: toastInLeft 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .toast-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: hsl(140 60% 55%);
+    box-shadow: 0 0 8px hsl(140 60% 55%);
+    flex-shrink: 0;
+  }
+  .toast .body { flex: 1; min-width: 0; }
+  .toast .ttl { font-size: 12px; color: var(--fg); font-weight: 500; line-height: 1.3; }
+  .toast .sub { font-size: 11px; color: var(--fg-subtle); margin-top: 2px; }
+  .toast .close {
+    width: 22px; height: 22px;
+    border-radius: var(--r-sm);
+    border: none;
+    background: transparent;
+    color: var(--fg-subtle);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .toast .close:hover { color: var(--fg); background: var(--glass); }
+  .toast .close svg { width: 12px; height: 12px; }
+
+  /* ============================================================
+     RESPONSIVE
+     ============================================================ */
+  @media (max-width: 900px) {
+    .app { --chat-w: 280px; }
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .chat { width: 280px; }
+  }
+  @media (max-width: 680px) {
+    .app { --chat-w: 0px; }
+    .chat { display: none; }
+    .tiles { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* Scrollbar — matches the global rule in index.css */
+  .stage::-webkit-scrollbar, .chat-list::-webkit-scrollbar,
+  .modal-nav::-webkit-scrollbar, .modal-content::-webkit-scrollbar { width: 6px; }
+  .stage::-webkit-scrollbar-thumb,
+  .chat-list::-webkit-scrollbar-thumb,
+  .modal-nav::-webkit-scrollbar-thumb,
+  .modal-content::-webkit-scrollbar-thumb { background: hsl(240 4% 16%); border-radius: 3px; }
+  .stage::-webkit-scrollbar-thumb:hover,
+  .chat-list::-webkit-scrollbar-thumb:hover,
+  .modal-nav::-webkit-scrollbar-thumb:hover,
+  .modal-content::-webkit-scrollbar-thumb:hover { background: hsl(240 4% 22%); }
+
+  /* ============================================================
+     SETTINGS MODAL
+     ============================================================ */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: hsla(240, 12%, 3%, 0.55);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    animation: overlayIn 0.25s ease;
+  }
+  .modal-overlay.open { display: flex; }
+  @keyframes overlayIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .modal-card {
+    width: 100%;
+    max-width: 880px;
+    height: 100%;
+    max-height: 640px;
+    background:
+      radial-gradient(ellipse 55% 40% at 0% 0%, hsla(240, 10%, 78%, 0.10), transparent 60%),
+      radial-gradient(ellipse 50% 40% at 100% 100%, hsla(240, 8%, 60%, 0.06), transparent 60%),
+      linear-gradient(160deg, hsl(240 8% 10%) 0%, hsl(240 12% 5%) 100%);
+    border-radius: 14px;
+    border: 1px solid var(--glass-bd-2);
+    box-shadow:
+      0 32px 80px -16px rgba(0,0,0,0.7),
+      inset 0 1px 0 hsla(240, 10%, 92%, 0.06);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: modalIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--hair);
+    flex-shrink: 0;
+  }
+  .modal-header h2 {
+    font-family: 'Geist', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--fg);
+  }
+  .modal-header .sub {
+    margin-left: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+  .modal-close {
+    margin-left: auto;
+    width: 30px; height: 30px;
+    border-radius: var(--r-md);
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--fg-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s ease;
+  }
+  .modal-close:hover {
+    background: var(--glass-2);
+    color: var(--fg);
+    border-color: var(--hair-strong);
+  }
+  .modal-close svg { width: 14px; height: 14px; }
+
+  .modal-body {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* ===== Nav ===== */
+  .modal-nav {
+    border-right: 1px solid var(--hair);
+    padding: 14px 10px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: hsla(240, 10%, 3%, 0.25);
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--r-md);
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--fg-muted);
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Geist', sans-serif;
+    font-weight: 500;
+    transition: 0.2s ease;
+    width: 100%;
+  }
+  .nav-item:hover {
+    background: var(--glass);
+    color: var(--fg);
+  }
+  .nav-item.active {
+    background: var(--glass-2);
+    color: var(--fg);
+    border-color: var(--glass-bd);
+    box-shadow:
+      inset 0 1px 0 hsla(0, 0%, 100%, 0.06),
+      0 4px 14px -8px rgba(0,0,0,0.4);
+  }
+  .nav-item svg { width: 15px; height: 15px; opacity: 0.85; flex-shrink: 0; }
+
+  /* ===== Content ===== */
+  .modal-content {
+    padding: 28px 32px;
+    overflow-y: auto;
+  }
+  .modal-pane { display: none; }
+  .modal-pane.active { display: block; animation: paneIn 0.25s ease; }
+  @keyframes paneIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .pane-head {
+    margin-bottom: 8px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .pane-head h3 {
+    font-family: 'Geist', sans-serif;
+    font-weight: 600;
+    font-size: 20px;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+  .pane-head .cap {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--fg-subtle);
+    letter-spacing: 0.02em;
+  }
+
+  /* ===== Setting row ===== */
+  .mset-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 24px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--hair);
+  }
+  .mset-row:last-child { border-bottom: none; }
+  .mset-row.block { display: block; }
+  .mset-row.block .mset-name { margin-bottom: 12px; display: block; }
+
+  .mset-name {
+    font-size: 13px;
+    color: var(--fg);
+    font-weight: 500;
+  }
+  .mset-desc {
+    display: block;
+    font-size: 12px;
+    color: var(--fg-subtle);
+    margin-top: 4px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  /* ===== Form controls inside modal ===== */
+  .mset-select {
+    background: linear-gradient(180deg, hsl(240 6% 12%) 0%, hsl(240 6% 8%) 100%);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    font-family: 'Geist', sans-serif;
+    font-size: 13px;
+    padding: 8px 32px 8px 12px;
+    border-radius: var(--r-md);
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 11px;
+    min-width: 220px;
+    outline: none;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+  .mset-select:hover { border-color: var(--hair-strong); }
+  .mset-select:focus {
+    border-color: hsla(240, 10%, 92%, 0.30);
+    box-shadow: 0 0 0 3px hsla(240, 10%, 80%, 0.08);
+  }
+
+  .mset-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: var(--r-md);
+    background: linear-gradient(180deg, var(--bg-muted) 0%, hsl(240 4% 10%) 100%);
+    border: 1px solid var(--hair-strong);
+    color: var(--fg);
+    cursor: pointer;
+    font-family: 'Geist', sans-serif;
+    transition: 0.2s ease;
+  }
+  .mset-btn:hover {
+    border-color: var(--glass-bd-2);
+    background: linear-gradient(180deg, hsl(240 4% 18%) 0%, hsl(240 4% 12%) 100%);
+  }
+  .mset-btn svg { width: 12px; height: 12px; }
+
+  /* level meter (input) */
+  .mset-meter {
+    width: 220px;
+    height: 10px;
+    background: hsl(240 6% 8%);
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+    position: relative;
+  }
+  .mset-meter-fill {
+    height: 100%;
+    width: 62%;
+    background: linear-gradient(90deg, hsl(240 4% 50%), hsl(240 8% 88%));
+    animation: meterFlick 1.6s ease-in-out infinite;
+  }
+  @keyframes meterFlick {
+    0%, 100% { width: 40%; }
+    30% { width: 75%; }
+    60% { width: 55%; }
+    80% { width: 82%; }
+  }
+
+  /* slider */
+  .mset-slider {
+    width: 220px;
+    height: 4px;
+    border-radius: 999px;
+    background: hsl(240 4% 14%);
+    position: relative;
+  }
+  .mset-slider-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, hsl(240 6% 60%), hsl(240 6% 92%));
+    width: 70%;
+  }
+  .mset-slider-knob {
+    position: absolute;
+    left: 70%;
+    top: 50%;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, hsl(240 6% 98%), hsl(240 6% 78%));
+    box-shadow: 0 2px 12px -2px var(--halo-glow), 0 0 0 1px hsla(240, 6%, 50%, 0.4);
+    transform: translate(-50%, -50%);
+    cursor: grab;
+  }
+  .mset-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .mset-slider-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* switch (re-use chat-ish style) */
+  .mset-switch {
+    width: 40px; height: 22px;
+    border-radius: var(--r-pill);
+    background: linear-gradient(180deg, hsl(240 4% 14%), hsl(240 4% 10%));
+    border: 1px solid var(--border);
+    position: relative;
+    cursor: pointer;
+    transition: 0.3s ease;
+    flex-shrink: 0;
+  }
+  .mset-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, hsl(240 4% 60%), hsl(240 4% 38%));
+    transition: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .mset-switch.on {
+    background: linear-gradient(180deg, hsl(240 6% 92%), hsl(240 6% 70%));
+    border-color: transparent;
+    box-shadow: 0 2px 12px -2px var(--halo-glow);
+  }
+  .mset-switch.on::after {
+    left: 20px;
+    background: linear-gradient(180deg, var(--bg-elevated), var(--bg));
+  }
+
+  /* radio cards — mic activation modes */
+  .mode-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .mode-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-bd);
+    border-radius: var(--r-md);
+    padding: 14px;
+    cursor: pointer;
+    transition: 0.2s ease;
+    position: relative;
+  }
+  .mode-card:hover { border-color: var(--hair-strong); }
+  .mode-card.active {
+    background: var(--glass-2);
+    border-color: hsla(240, 10%, 92%, 0.30);
+    box-shadow:
+      0 4px 20px -8px var(--halo-glow),
+      inset 0 1px 0 hsla(0, 0%, 100%, 0.06);
+  }
+  .mode-card.active::after {
+    content: '';
+    position: absolute;
+    top: 10px; right: 10px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--pearl);
+    box-shadow: 0 0 8px var(--halo-glow);
+  }
+  .mode-card-title {
+    font-size: 13px;
+    color: var(--fg);
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .mode-card-desc {
+    font-size: 11px;
+    color: var(--fg-subtle);
+    line-height: 1.5;
+  }
+
+  /* kbd chip */
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 9px;
+    border-radius: var(--r-sm);
+    background: linear-gradient(180deg, hsl(240 6% 16%), hsl(240 6% 10%));
+    border: 1px solid var(--border);
+    border-bottom: 1.5px solid hsl(240 4% 22%);
+    color: var(--fg);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    margin: 0 1px;
+  }
+  .kbd-row { display: inline-flex; align-items: center; gap: 4px; }
+  .kbd-plus { color: var(--fg-subtle); font-size: 11px; margin: 0 2px; }
+
+  /* radio cards — screen share preset */
+  .preset-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .preset-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-bd);
+    border-radius: var(--r-md);
+    padding: 14px;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+  .preset-card:hover { border-color: var(--hair-strong); }
+  .preset-card.active {
+    background: var(--glass-2);
+    border-color: hsla(240, 10%, 92%, 0.30);
+    box-shadow:
+      0 4px 20px -8px var(--halo-glow),
+      inset 0 1px 0 hsla(0, 0%, 100%, 0.06);
+  }
+  .preset-title {
+    font-family: 'Geist', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--fg);
+    letter-spacing: -0.005em;
+  }
+  .preset-spec {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--fg-subtle);
+    letter-spacing: 0.05em;
+    margin-top: 6px;
+  }
+
+  /* About pane */
+  .about {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    padding: 12px 0;
+  }
+  .about-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--hair);
+  }
+  .about-row .k {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+  .about-row .v {
+    font-family: 'Geist', sans-serif;
+    font-size: 14px;
+    color: var(--fg);
+    font-weight: 500;
+  }
+
+  /* Theme picker — visualizes Velvet Onyx vs Default in Appearance? Not needed yet —
+     skipped. */
+
+  @media (max-width: 760px) {
+    .modal-body { grid-template-columns: 1fr; }
+    .modal-nav {
+      flex-direction: row;
+      overflow-x: auto;
+      border-right: none;
+      border-bottom: 1px solid var(--hair);
+    }
+    .nav-item { white-space: nowrap; }
+    .mode-cards, .preset-cards { grid-template-columns: 1fr; }
+    .about { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Icon defs (lucide-style outline) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></symbol>
+    <symbol id="i-mic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="2" x2="22" y2="22"/><path d="M9 9v5a3 3 0 0 0 5.12 2.12"/><path d="M15 9.34V6a3 3 0 0 0-5.94-.6"/><path d="M19 11a7 7 0 0 1-.45 2.5"/><path d="M12 18v3"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h12v10H3z"/><path d="m21 8-6 4 6 4V8z"/></symbol>
+    <symbol id="i-video-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="2" x2="22" y2="22"/><path d="M16 16v1H3V7h6"/><path d="M21 8v8l-6-4 6-4z"/></symbol>
+    <symbol id="i-monitor-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M9 10l3-3 3 3"/><path d="M12 7v6"/></symbol>
+    <symbol id="i-phone-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-3.4-2.6"/><line x1="23" y1="1" x2="1" y2="23"/></symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+    <symbol id="i-headphones" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13a2 2 0 0 0 2-2V7a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0V4a2 2 0 0 1 4 0v13a2 2 0 0 0 4 0v-4a2 2 0 0 1 2-2"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M6 14h0M18 14h0M8 14h8"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+
+  <!-- ============================================================
+       TITLEBAR  (TitleBar + RoomView header content)
+       ============================================================ -->
+  <header class="titlebar">
+    <button class="room-pill" aria-label="Покинуть комнату">
+      <svg><use href="#i-chevron-left"/></svg>
+      <span class="name">Studio · Wednesday review</span>
+      <span class="count">3/8</span>
+    </button>
+
+    <div class="titlebar-right">
+      <div class="quality" title="Соединение: отличное · 22 мс до сервера">
+        <span class="quality-bars">
+          <span></span><span></span><span></span>
+        </span>
+        <span class="rtt">22 ms</span>
+      </div>
+      <span class="conn-state">CONNECTED</span>
+      <button class="icon-btn-titlebar" aria-label="Настройки" onclick="openSettings()">
+        <svg><use href="#i-settings"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       MAIN  ( participants + chat )
+       ============================================================ -->
+  <main class="main">
+
+    <!-- ===== Participants ===== -->
+    <section class="stage">
+      <div class="tiles">
+
+        <!-- You · mic on, cam off -->
+        <div class="tile">
+          <div class="tile-quality">
+            <span class="bars"><span></span><span></span><span></span></span>
+            <span>22</span>
+          </div>
+          <div class="tile-avatar a-nikita">Н</div>
+          <div class="tile-foot">
+            <span class="tile-name">Никита<span class="you">ТЫ</span></span>
+            <span class="tile-mic transmitting" title="Микрофон активен"><svg><use href="#i-mic"/></svg></span>
+          </div>
+        </div>
+
+        <!-- Lena · speaking + camera on (fake video feed) -->
+        <div class="tile has-video speaking">
+          <div class="fake-silhouette"></div>
+          <div class="tile-quality">
+            <span class="bars"><span></span><span></span><span></span></span>
+            <span>18</span>
+          </div>
+          <div class="tile-foot">
+            <span class="tile-name">Лена Петрова</span>
+            <span class="tile-mic transmitting" title="Говорит"><svg><use href="#i-mic"/></svg></span>
+          </div>
+        </div>
+
+        <!-- Aaron · muted -->
+        <div class="tile">
+          <div class="tile-quality">
+            <span class="bars"><span></span><span></span><span class="dim"></span></span>
+            <span>84</span>
+          </div>
+          <div class="tile-avatar a-aaron">A</div>
+          <div class="tile-foot">
+            <span class="tile-name">Aaron K.</span>
+            <span class="tile-mic muted" title="Микрофон выключен"><svg><use href="#i-mic-off"/></svg></span>
+          </div>
+        </div>
+
+        <!-- Marie · cam on, mic muted -->
+        <div class="tile has-video">
+          <div class="fake-silhouette"></div>
+          <div class="tile-quality">
+            <span class="bars"><span></span><span></span><span></span></span>
+            <span>34</span>
+          </div>
+          <div class="tile-foot">
+            <span class="tile-name">Marie L.</span>
+            <span class="tile-mic muted"><svg><use href="#i-mic-off"/></svg></span>
+          </div>
+        </div>
+
+        <!-- Tom -->
+        <div class="tile">
+          <div class="tile-quality">
+            <span class="bars"><span></span><span></span><span></span></span>
+            <span>29</span>
+          </div>
+          <div class="tile-avatar a-tom">T</div>
+          <div class="tile-foot">
+            <span class="tile-name">Tom Avery</span>
+            <span class="tile-mic" title="Микрофон активен"><svg><use href="#i-mic"/></svg></span>
+          </div>
+        </div>
+
+        <!-- Empty slot -->
+        <div class="tile">
+          <div class="tile-quality">
+            <span class="bars"><span class="dim"></span><span class="dim"></span><span class="dim"></span></span>
+            <span>—</span>
+          </div>
+          <div class="tile-avatar a-empty">+</div>
+          <div class="tile-foot">
+            <span class="tile-name" style="opacity:0.6;">Свободный слот</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== Chat panel ===== -->
+    <aside class="chat">
+
+      <div class="chat-head">
+        <span class="title">Чат</span>
+        <span class="live">live</span>
+      </div>
+
+      <div class="chat-list">
+
+        <!-- Remote: Lena -->
+        <div class="msg">
+          <div class="msg-avatar a-lena">Л</div>
+          <div class="msg-body">
+            <span class="msg-from">Лена Петрова</span>
+            <div class="bubble">Привет, я подключилась. Звук слышно?</div>
+          </div>
+        </div>
+
+        <!-- Local: you -->
+        <div class="msg local">
+          <div class="msg-avatar a-nikita">Н</div>
+          <div class="msg-body">
+            <span class="msg-from">Ты</span>
+            <div class="bubble">Да, отлично слышно. Aaron подключается, сейчас.</div>
+          </div>
+        </div>
+
+        <!-- Remote: Aaron - file -->
+        <div class="msg">
+          <div class="msg-avatar a-aaron">A</div>
+          <div class="msg-body">
+            <span class="msg-from">Aaron K.</span>
+            <div class="file-bubble">
+              <div class="file-icon">
+                <span class="file-icon-glyph"><svg><use href="#i-file"/></svg></span>
+                <span class="file-icon-ext">PDF</span>
+              </div>
+              <div class="file-info">
+                <span class="file-name">brief-q2-2026.pdf</span>
+                <span class="file-meta">2.4 МБ</span>
+              </div>
+              <button class="file-dl" aria-label="Скачать"><svg><use href="#i-download"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Remote: Marie - image -->
+        <div class="msg">
+          <div class="msg-avatar a-marie">M</div>
+          <div class="msg-body">
+            <span class="msg-from">Marie L.</span>
+            <div class="img-bubble">
+              <div class="img-fake">
+                <span class="img-meta">
+                  <svg><use href="#i-image"/></svg>
+                  <span>moodboard.jpg · 248 КБ</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Local: you - link -->
+        <div class="msg local">
+          <div class="msg-avatar a-nikita">Н</div>
+          <div class="msg-body">
+            <span class="msg-from">Ты</span>
+            <div class="bubble">Док тут — <a href="#">https://notion.so/q2-brief</a></div>
+          </div>
+        </div>
+
+        <!-- Remote: Lena -->
+        <div class="msg">
+          <div class="msg-avatar a-lena">Л</div>
+          <div class="msg-body">
+            <span class="msg-from">Лена Петрова</span>
+            <div class="bubble">Спасибо! Открою параллельно.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <form class="chat-form" onsubmit="event.preventDefault()">
+        <div class="chat-input-wrap">
+          <button type="button" class="chat-attach" aria-label="Прикрепить файл">
+            <svg><use href="#i-paperclip"/></svg>
+          </button>
+          <input class="chat-input" type="text" placeholder="Сообщение…" maxlength="500" />
+          <button type="submit" class="chat-send" aria-label="Отправить">
+            <svg><use href="#i-arrow-up"/></svg>
+          </button>
+        </div>
+      </form>
+
+    </aside>
+  </main>
+
+  <!-- ============================================================
+       CONTROL BAR
+       ============================================================ -->
+  <footer class="controlbar">
+
+    <!-- Mic — accent (transmitting in always-on mode) -->
+    <button class="tool accent" aria-label="Выключить микрофон" title="Выключить микрофон">
+      <svg><use href="#i-mic"/></svg>
+    </button>
+
+    <!-- Camera — secondary + mutedStyle (off) -->
+    <button class="tool muted-style" aria-label="Включить камеру" title="Включить камеру">
+      <svg><use href="#i-video-off"/></svg>
+    </button>
+
+    <!-- Screen share — secondary -->
+    <button class="tool" aria-label="Демонстрация экрана" title="Демонстрация экрана">
+      <svg><use href="#i-monitor-up"/></svg>
+    </button>
+
+    <span class="ctrl-sep"></span>
+
+    <!-- Leave — destructive -->
+    <button class="btn-leave" aria-label="Покинуть комнату">
+      <svg><use href="#i-phone-off"/></svg>
+      <span>Выйти</span>
+    </button>
+
+  </footer>
+
+  <!-- ============================================================
+       TOAST TRAY
+       ============================================================ -->
+  <div class="toast-tray">
+    <div class="toast">
+      <span class="toast-dot"></span>
+      <div class="body">
+        <div class="ttl">Tom Avery подключился</div>
+        <div class="sub">3 участника · RTT 22 мс</div>
+      </div>
+      <button class="close" aria-label="Закрыть"><svg><use href="#i-x"/></svg></button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================================
+     SETTINGS MODAL
+     Mirrors apps/client/src/renderer/components/SettingsModal.tsx
+     Tabs: devices · mic · audio · hotkeys · screen · system
+     ============================================================ -->
+<div class="modal-overlay" id="settings-modal" onclick="if (event.target === this) closeSettings()">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <header class="modal-header">
+      <h2 id="settings-title">Настройки</h2>
+      <span class="sub">Voicechat · v0.4.0</span>
+      <button class="modal-close" onclick="closeSettings()" aria-label="Закрыть">
+        <svg><use href="#i-x"/></svg>
+      </button>
+    </header>
+
+    <div class="modal-body">
+
+      <!-- Sidebar nav -->
+      <nav class="modal-nav">
+        <button class="nav-item active" data-tab="devices" onclick="showTab('devices')">
+          <svg><use href="#i-headphones"/></svg>Устройства
+        </button>
+        <button class="nav-item" data-tab="mic" onclick="showTab('mic')">
+          <svg><use href="#i-mic"/></svg>Микрофон
+        </button>
+        <button class="nav-item" data-tab="audio" onclick="showTab('audio')">
+          <svg><use href="#i-wave"/></svg>Обработка звука
+        </button>
+        <button class="nav-item" data-tab="hotkeys" onclick="showTab('hotkeys')">
+          <svg><use href="#i-keyboard"/></svg>Горячие клавиши
+        </button>
+        <button class="nav-item" data-tab="screen" onclick="showTab('screen')">
+          <svg><use href="#i-monitor-up"/></svg>Демонстрация
+        </button>
+        <button class="nav-item" data-tab="system" onclick="showTab('system')">
+          <svg><use href="#i-sliders"/></svg>Система
+        </button>
+      </nav>
+
+      <!-- Content -->
+      <section class="modal-content">
+
+        <!-- ===== Устройства ===== -->
+        <div class="modal-pane active" id="pane-devices">
+          <div class="pane-head">
+            <h3>Устройства</h3>
+            <div class="cap">микрофон, камера, выход</div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Микрофон</span>
+              <span class="mset-desc">Активное устройство ввода</span>
+            </div>
+            <select class="mset-select">
+              <option>Shure SM7B (USB)</option>
+              <option>MacBook Pro Microphone</option>
+              <option>AirPods Pro</option>
+            </select>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Уровень входа</span>
+              <span class="mset-desc">Живой VU-метр</span>
+            </div>
+            <div class="mset-meter"><div class="mset-meter-fill"></div></div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Камера</span>
+              <span class="mset-desc">Используется при включении видео</span>
+            </div>
+            <select class="mset-select">
+              <option>FaceTime HD Camera</option>
+              <option>OBS Virtual Camera</option>
+              <option>Без камеры</option>
+            </select>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Аудио-выход</span>
+              <span class="mset-desc">Куда подаётся голос собеседников</span>
+            </div>
+            <select class="mset-select">
+              <option>Studio Monitors L+R</option>
+              <option>Системный выход по умолчанию</option>
+              <option>AirPods Pro</option>
+            </select>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Громкость выхода</span>
+              <span class="mset-desc">−4 dB · стерео</span>
+            </div>
+            <div class="mset-slider-row">
+              <div class="mset-slider">
+                <div class="mset-slider-fill"></div>
+                <div class="mset-slider-knob"></div>
+              </div>
+              <span class="mset-slider-val">70%</span>
+            </div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Тестовый сигнал</span>
+              <span class="mset-desc">Проиграть короткий тон на выходе</span>
+            </div>
+            <button class="mset-btn"><svg><use href="#i-volume"/></svg>Проиграть</button>
+          </div>
+        </div>
+
+        <!-- ===== Микрофон ===== -->
+        <div class="modal-pane" id="pane-mic">
+          <div class="pane-head">
+            <h3>Микрофон</h3>
+            <div class="cap">режим активации</div>
+          </div>
+
+          <div class="mset-row block">
+            <span class="mset-name">Когда передавать голос</span>
+            <span class="mset-desc">Выбери, что должно открывать твой микрофон в эфир.</span>
+            <div class="mode-cards">
+              <div class="mode-card active">
+                <div class="mode-card-title">Всегда</div>
+                <div class="mode-card-desc">Микрофон открыт пока ты сам не выключишь.</div>
+              </div>
+              <div class="mode-card">
+                <div class="mode-card-title">Push-to-talk</div>
+                <div class="mode-card-desc">Транслирует только пока удерживаешь клавишу.</div>
+              </div>
+              <div class="mode-card">
+                <div class="mode-card-title">Voice activation</div>
+                <div class="mode-card-desc">Открывается автоматически, когда ты заговорил.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Усиление микрофона</span>
+              <span class="mset-desc">Программное усиление сигнала</span>
+            </div>
+            <div class="mset-slider-row">
+              <div class="mset-slider">
+                <div class="mset-slider-fill" style="width: 50%;"></div>
+                <div class="mset-slider-knob" style="left: 50%;"></div>
+              </div>
+              <span class="mset-slider-val">0 dB</span>
+            </div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Сэмплирование</span>
+              <span class="mset-desc">Частота захвата с устройства</span>
+            </div>
+            <select class="mset-select">
+              <option>48 kHz · рекомендуется</option>
+              <option>44.1 kHz</option>
+              <option>16 kHz · экономия трафика</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ===== Обработка звука ===== -->
+        <div class="modal-pane" id="pane-audio">
+          <div class="pane-head">
+            <h3>Обработка звука</h3>
+            <div class="cap">эхо, шум, авто-громкость</div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Подавление шума</span>
+              <span class="mset-desc">RNN-модель убирает клавиатуру, кулеры, эхо комнаты</span>
+            </div>
+            <span class="mset-switch on"></span>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Эхоподавление</span>
+              <span class="mset-desc">Рекомендуется при выводе через колонки</span>
+            </div>
+            <span class="mset-switch on"></span>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Авто-громкость</span>
+              <span class="mset-desc">−6 dB headroom · по умолчанию выключено</span>
+            </div>
+            <span class="mset-switch"></span>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">High-pass фильтр</span>
+              <span class="mset-desc">Отрезает гул ниже 80 Гц</span>
+            </div>
+            <span class="mset-switch on"></span>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">VAD-чувствительность</span>
+              <span class="mset-desc">Только при режиме Voice activation</span>
+            </div>
+            <div class="mset-slider-row">
+              <div class="mset-slider">
+                <div class="mset-slider-fill" style="width: 64%;"></div>
+                <div class="mset-slider-knob" style="left: 64%;"></div>
+              </div>
+              <span class="mset-slider-val">−42 dB</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== Горячие клавиши ===== -->
+        <div class="modal-pane" id="pane-hotkeys">
+          <div class="pane-head">
+            <h3>Горячие клавиши</h3>
+            <div class="cap">глобальные и внутри окна</div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Push-to-talk</span>
+              <span class="mset-desc">Глобальная, работает вне окна voicechat</span>
+            </div>
+            <div class="kbd-row">
+              <span class="kbd">⌥</span><span class="kbd-plus">+</span><span class="kbd">Space</span>
+              <button class="mset-btn" style="margin-left: 10px;"><svg><use href="#i-refresh"/></svg>Изменить</button>
+            </div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Выключить / включить микрофон</span>
+              <span class="mset-desc">Toggle mute</span>
+            </div>
+            <div class="kbd-row">
+              <span class="kbd">⌘</span><span class="kbd-plus">+</span><span class="kbd">Shift</span><span class="kbd-plus">+</span><span class="kbd">M</span>
+            </div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Покинуть комнату</span>
+              <span class="mset-desc">Глобальный экстренный выход</span>
+            </div>
+            <div class="kbd-row">
+              <span class="kbd">⌘</span><span class="kbd-plus">+</span><span class="kbd">Shift</span><span class="kbd-plus">+</span><span class="kbd">L</span>
+            </div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Открыть настройки</span>
+              <span class="mset-desc">Внутри окна</span>
+            </div>
+            <div class="kbd-row">
+              <span class="kbd">⌘</span><span class="kbd-plus">+</span><span class="kbd">,</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== Демонстрация экрана ===== -->
+        <div class="modal-pane" id="pane-screen">
+          <div class="pane-head">
+            <h3>Демонстрация экрана</h3>
+            <div class="cap">разрешение, fps, кодек</div>
+          </div>
+
+          <div class="mset-row block">
+            <span class="mset-name">Профиль качества</span>
+            <span class="mset-desc">Выбери баланс между плавностью и чёткостью.</span>
+            <div class="preset-cards">
+              <div class="preset-card active">
+                <div class="preset-title">Smooth</div>
+                <div class="preset-spec">1920×1080 · 60 FPS · 8 Mbps</div>
+              </div>
+              <div class="preset-card">
+                <div class="preset-title">Sharp</div>
+                <div class="preset-spec">2560×1440 · 30 FPS · 10 Mbps</div>
+              </div>
+              <div class="preset-card">
+                <div class="preset-title">Max</div>
+                <div class="preset-spec">2560×1440 · 60 FPS · 12 Mbps</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Видеокодек</span>
+              <span class="mset-desc">VP8 быстрее на CPU · H.264 даёт лучше картинку</span>
+            </div>
+            <select class="mset-select">
+              <option>VP8 · libvpx (рекомендуется)</option>
+              <option>H.264 · OpenH264</option>
+              <option>VP9</option>
+            </select>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Делиться системным звуком</span>
+              <span class="mset-desc">Только на Tauri / WebView2 пути</span>
+            </div>
+            <span class="mset-switch on"></span>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Подсвечивать активное окно</span>
+              <span class="mset-desc">Системная рамка вокруг шаренного окна</span>
+            </div>
+            <span class="mset-switch"></span>
+          </div>
+        </div>
+
+        <!-- ===== Система ===== -->
+        <div class="modal-pane" id="pane-system">
+          <div class="pane-head">
+            <h3>Система</h3>
+            <div class="cap">звуки, уведомления, поведение</div>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Тема оформления</span>
+              <span class="mset-desc">Цветовая палитра приложения</span>
+            </div>
+            <select class="mset-select">
+              <option>Velvet Onyx</option>
+              <option>Default (zinc neutral)</option>
+            </select>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Угол для всплывающих уведомлений</span>
+              <span class="mset-desc">Где появляются тосты на экране</span>
+            </div>
+            <select class="mset-select">
+              <option>Слева снизу</option>
+              <option>Справа снизу</option>
+              <option>Слева сверху</option>
+              <option>Справа сверху</option>
+            </select>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Системные уведомления</span>
+              <span class="mset-desc">Показывать тосты ОС когда окно вне фокуса</span>
+            </div>
+            <span class="mset-switch on"></span>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Звуки событий</span>
+              <span class="mset-desc">Подключение / отключение участников</span>
+            </div>
+            <span class="mset-switch on"></span>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Запускать при старте системы</span>
+              <span class="mset-desc">Автоматически открывать в трее</span>
+            </div>
+            <span class="mset-switch"></span>
+          </div>
+
+          <div class="mset-row">
+            <div>
+              <span class="mset-name">Сворачивать в трей при закрытии</span>
+              <span class="mset-desc">Окно не закрывается, а уходит в трей</span>
+            </div>
+            <span class="mset-switch on"></span>
+          </div>
+
+          <div class="about">
+            <div class="about-row">
+              <span class="k">Версия</span>
+              <span class="v">0.4.0 · build 2026.05.23</span>
+            </div>
+            <div class="about-row">
+              <span class="k">Клиент</span>
+              <span class="v">Electron · 31.3.1</span>
+            </div>
+            <div class="about-row">
+              <span class="k">LiveKit SFU</span>
+              <span class="v">EU-WEST-2 · v1.7.2</span>
+            </div>
+            <div class="about-row">
+              <span class="k">Лобби</span>
+              <span class="v">lobby.voicechat.app</span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+  function openSettings() {
+    document.getElementById('settings-modal').classList.add('open');
+  }
+  function closeSettings() {
+    document.getElementById('settings-modal').classList.remove('open');
+  }
+  function showTab(tabId) {
+    document.querySelectorAll('.nav-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.tab === tabId);
+    });
+    document.querySelectorAll('.modal-pane').forEach(el => {
+      el.classList.toggle('active', el.id === 'pane-' + tabId);
+    });
+    document.querySelector('.modal-content').scrollTo({ top: 0 });
+  }
+  // Esc closes modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSettings();
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Obsidian Atelier · Luxury Theme</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     OBSIDIAN ATELIER — luxury theme alternative for Voicechat
+     Same zinc-240 base as the app. No italic. No warm tints.
+     The luxury comes from editorial calm: generous whitespace,
+     hairline dividers, asymmetric layout, upright serif headlines.
+     ============================================================ */
+  :root {
+    --bg:           hsl(240 10% 4%);
+    --bg-elevated:  hsl(240 6% 10%);
+    --bg-muted:     hsl(240 4% 14%);
+    --border:       hsl(240 4% 16%);
+    --fg:           hsl(0 0% 98%);
+    --fg-muted:     hsl(240 5% 65%);
+    --fg-subtle:    hsl(240 4% 46%);
+    --destructive:  hsl(346 77% 49%);
+
+    --pearl:        hsl(240 8% 92%);
+    --pearl-soft:   hsl(240 6% 70%);
+    --hair:         hsla(0, 0%, 100%, 0.05);
+    --hair-strong:  hsla(0, 0%, 100%, 0.10);
+
+    --r-sm: 4px;
+    --r-md: 6.4px;
+    --r-lg: 10px;
+    --r-pill: 999px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  body {
+    min-height: 100vh;
+    background:
+      linear-gradient(180deg, hsl(240 10% 3%) 0%, var(--bg) 50%, hsl(240 10% 3%) 100%);
+    position: relative;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/></svg>");
+  }
+
+  .frame {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 64px 96px 120px;
+    position: relative;
+  }
+
+  /* ===== Top bar ===== */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--hair);
+    padding-bottom: 24px;
+    margin-bottom: 96px;
+  }
+  .mark {
+    font-family: 'Instrument Serif', serif;
+    font-size: 24px;
+    letter-spacing: -0.01em;
+  }
+  .mark .sep { color: var(--fg-subtle); margin: 0 10px; }
+  .mark .lbl { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--fg-subtle); }
+
+  .meta { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--fg-subtle); }
+
+  /* ===== Hero ===== */
+  .hero {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr;
+    gap: 96px;
+    align-items: end;
+    margin-bottom: 128px;
+  }
+  .hero-meta {
+    border-left: 1px solid var(--hair);
+    padding-left: 28px;
+    padding-bottom: 8px;
+  }
+  .hero-meta .roman {
+    font-family: 'Instrument Serif', serif;
+    font-size: 56px;
+    color: var(--pearl-soft);
+    line-height: 1;
+    margin-bottom: 24px;
+  }
+  .hero-meta .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.35em;
+    color: var(--fg-subtle);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .hero-meta .small {
+    font-size: 14px;
+    color: var(--fg-muted);
+    line-height: 1.6;
+    max-width: 28ch;
+    font-weight: 300;
+  }
+  .hero h1 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: clamp(72px, 10vw, 152px);
+    line-height: 0.92;
+    letter-spacing: -0.025em;
+    color: var(--fg);
+    background: linear-gradient(180deg, hsl(240 8% 96%) 0%, hsl(240 6% 60%) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* ===== Section heading ===== */
+  .section { margin-bottom: 96px; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 28px;
+    margin-bottom: 36px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .section-head h2 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: 36px;
+    letter-spacing: -0.01em;
+  }
+  .section-head .num {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--fg-subtle);
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-left: auto;
+  }
+
+  /* ===== Call bar ===== */
+  .callbar-wrap { display: flex; justify-content: center; padding: 24px 0; }
+  .callbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 28px;
+    padding: 20px 36px;
+    border-radius: var(--r-pill);
+    background: linear-gradient(180deg, var(--bg-elevated) 0%, hsl(240 6% 8%) 100%);
+    border: 1px solid var(--hair-strong);
+  }
+  .callbar-sep { width: 1px; align-self: stretch; background: var(--hair); margin: 4px 0; }
+
+  /* ===== Icon button ===== */
+  .icon-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--fg-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.25s ease;
+  }
+  .icon-btn:hover {
+    color: var(--fg);
+    border-color: var(--pearl-soft);
+    background: hsla(240, 10%, 92%, 0.04);
+  }
+  .icon-btn.active {
+    color: var(--bg);
+    background: linear-gradient(180deg, var(--pearl) 0%, hsl(240 6% 72%) 100%);
+    border-color: transparent;
+  }
+  .icon-btn.muted {
+    color: var(--destructive);
+    border-color: hsla(346, 70%, 50%, 0.3);
+  }
+  .icon-btn.hangup {
+    color: var(--fg);
+    background: linear-gradient(180deg, hsl(346 77% 49%), hsl(346 70% 36%));
+    border-color: transparent;
+  }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .icon-btn.lg { width: 48px; height: 48px; }
+  .icon-btn.lg svg { width: 18px; height: 18px; }
+  .icon-btn.sm { width: 30px; height: 30px; border-radius: var(--r-md); }
+  .icon-btn.sm svg { width: 13px; height: 13px; }
+
+  /* ===== Icon button state row ===== */
+  .icon-states {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    border-top: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+  }
+  .icon-state {
+    padding: 28px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    border-right: 1px solid var(--hair);
+  }
+  .icon-state:last-child { border-right: none; }
+  .icon-state .lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+
+  /* ===== Buttons ===== */
+  .btn-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 32px 0; }
+  .btn {
+    font-family: 'Geist', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 11px 22px;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: 0.25s ease;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1;
+  }
+  .btn svg { width: 14px; height: 14px; }
+  .btn-primary {
+    background: linear-gradient(180deg, hsl(240 6% 98%) 0%, hsl(240 6% 84%) 100%);
+    color: var(--bg);
+  }
+  .btn-primary:hover { background: linear-gradient(180deg, hsl(240 6% 100%) 0%, hsl(240 6% 88%) 100%); }
+  .btn-secondary {
+    background: linear-gradient(180deg, var(--bg-muted) 0%, hsl(240 4% 10%) 100%);
+    color: var(--fg);
+    border-color: var(--hair-strong);
+  }
+  .btn-ghost {
+    background: transparent;
+    border-color: var(--hair);
+    color: var(--fg-muted);
+  }
+  .btn-ghost:hover { border-color: var(--hair-strong); color: var(--fg); }
+  .btn-destructive {
+    background: linear-gradient(180deg, hsl(346 77% 49%), hsl(346 70% 36%));
+    color: var(--fg);
+  }
+
+  /* ===== Two col ===== */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; }
+  .editorial-col { padding: 8px 0; }
+  .editorial-col h3 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: 28px;
+    margin-bottom: 32px;
+    letter-spacing: -0.01em;
+  }
+
+  /* ===== Inputs ===== */
+  .field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .field-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+  .input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--hair-strong);
+    color: var(--fg);
+    font-family: 'Geist', sans-serif;
+    font-size: 16px;
+    padding: 10px 0;
+    outline: none;
+    width: 100%;
+    transition: 0.2s ease;
+  }
+  .input::placeholder { color: var(--fg-subtle); }
+  .input:hover { border-bottom-color: var(--fg-subtle); }
+  .input:focus { border-bottom-color: var(--pearl); }
+
+  select.input {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 0 center;
+    background-size: 12px;
+    padding-right: 24px;
+  }
+
+  /* ===== Settings rows ===== */
+  .pref-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 24px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--hair);
+  }
+  .pref-row:last-child { border-bottom: none; }
+  .pref-key { font-size: 15px; color: var(--fg); }
+  .pref-desc { display: block; font-size: 12px; color: var(--fg-subtle); margin-top: 4px; font-weight: 300; }
+
+  /* ===== Switch ===== */
+  .switch {
+    width: 38px; height: 22px;
+    border-radius: var(--r-pill);
+    background: var(--bg-muted);
+    border: 1px solid var(--border);
+    position: relative;
+    cursor: pointer;
+    transition: 0.3s ease;
+  }
+  .switch::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(180deg, hsl(240 4% 60%), hsl(240 4% 38%));
+    transition: 0.3s ease;
+  }
+  .switch.on { background: linear-gradient(180deg, var(--pearl), hsl(240 6% 70%)); border-color: transparent; }
+  .switch.on::after { left: 18px; background: linear-gradient(180deg, var(--bg-elevated), var(--bg)); }
+
+  /* ===== Palette ===== */
+  .palette {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
+  }
+  .swatch {
+    aspect-ratio: 1/1.15;
+    border: 1px solid var(--hair-strong);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .swatch-name { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: hsla(0, 0%, 100%, 0.85); }
+  .swatch-hex { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: hsla(0, 0%, 100%, 0.55); }
+  .swatch.light .swatch-name, .swatch.light .swatch-hex { color: hsla(240, 10%, 4%, 0.85); }
+  .swatch.light .swatch-hex { color: hsla(240, 10%, 4%, 0.55); }
+
+  /* ===== Footer ===== */
+  .footer {
+    margin-top: 96px;
+    padding-top: 28px;
+    border-top: 1px solid var(--hair);
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+  .footer a { color: var(--fg-muted); text-decoration: none; }
+  .footer a:hover { color: var(--fg); }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero, .section { animation: rise 1s cubic-bezier(0.2,0.8,0.2,1) backwards; }
+  .section:nth-of-type(2) { animation-delay: 0.1s; }
+  .section:nth-of-type(3) { animation-delay: 0.2s; }
+  .section:nth-of-type(4) { animation-delay: 0.3s; }
+
+  @media (max-width: 980px) {
+    .frame { padding: 40px 24px 80px; }
+    .hero { grid-template-columns: 1fr; gap: 32px; }
+    .grid-2 { grid-template-columns: 1fr; gap: 32px; }
+    .icon-states { grid-template-columns: repeat(3, 1fr); }
+    .palette { grid-template-columns: repeat(4, 1fr); }
+    .callbar { gap: 12px; padding: 14px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></symbol>
+    <symbol id="i-mic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="4" x2="20" y2="20"/><path d="M9 9v5a3 3 0 0 0 5.12 2.12"/><path d="M15 9.34V6a3 3 0 0 0-5.94-.6"/><path d="M19 11a7 7 0 0 1-.45 2.5"/><path d="M12 18v3"/></symbol>
+    <symbol id="i-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h12v10H3z"/><path d="m21 8-6 4 6 4V8z"/></symbol>
+    <symbol id="i-screen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-12 7l-5 1 1-5a8 8 0 1 1 16-3z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+    <symbol id="i-hangup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12.6a16 16 0 0 0-20 0l1.7 2.7a2 2 0 0 0 2.5.7l2.4-1a2 2 0 0 0 1.2-2l-.3-2.3a14 14 0 0 1 4.8 0L13.7 13a2 2 0 0 0 1.2 2l2.4 1a2 2 0 0 0 2.5-.7z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+  </defs>
+</svg>
+
+<div class="frame">
+
+  <header class="topbar">
+    <div class="mark">Voicechat<span class="sep">·</span><span class="lbl">Obsidian Atelier</span></div>
+    <div class="meta">Theme № 01</div>
+  </header>
+
+  <section class="hero">
+    <aside class="hero-meta">
+      <div class="roman">I</div>
+      <div class="tag">Chapter One</div>
+      <p class="small">An editorial composition built on voicechat's own zinc palette. Generous whitespace, hairline dividers, upright serif headlines.</p>
+    </aside>
+    <h1>Obsidian<br>Atelier</h1>
+  </section>
+
+  <!-- Call bar -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Call bar</h2>
+      <span class="num">§ 01</span>
+    </div>
+    <div class="callbar-wrap">
+      <div class="callbar">
+        <button class="icon-btn lg"><svg><use href="#i-mic"/></svg></button>
+        <button class="icon-btn lg muted"><svg><use href="#i-mic-off"/></svg></button>
+        <button class="icon-btn lg"><svg><use href="#i-cam"/></svg></button>
+        <button class="icon-btn lg active"><svg><use href="#i-screen"/></svg></button>
+        <span class="callbar-sep"></span>
+        <button class="icon-btn lg"><svg><use href="#i-chat"/></svg></button>
+        <button class="icon-btn lg"><svg><use href="#i-users"/></svg></button>
+        <button class="icon-btn lg"><svg><use href="#i-settings"/></svg></button>
+        <span class="callbar-sep"></span>
+        <button class="icon-btn lg hangup"><svg><use href="#i-hangup"/></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Icon state row -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Icon button states</h2>
+      <span class="num">§ 02</span>
+    </div>
+    <div class="icon-states">
+      <div class="icon-state"><button class="icon-btn"><svg><use href="#i-mic"/></svg></button><span class="lbl">Default</span></div>
+      <div class="icon-state"><button class="icon-btn" style="color:var(--fg); border-color:var(--pearl-soft); background:hsla(240, 10%, 92%, 0.04);"><svg><use href="#i-mic"/></svg></button><span class="lbl">Hover</span></div>
+      <div class="icon-state"><button class="icon-btn active"><svg><use href="#i-mic"/></svg></button><span class="lbl">Active</span></div>
+      <div class="icon-state"><button class="icon-btn muted"><svg><use href="#i-mic-off"/></svg></button><span class="lbl">Muted</span></div>
+      <div class="icon-state"><button class="icon-btn hangup"><svg><use href="#i-hangup"/></svg></button><span class="lbl">Destructive</span></div>
+      <div class="icon-state"><button class="icon-btn" style="opacity:0.35; pointer-events:none;"><svg><use href="#i-mic"/></svg></button><span class="lbl">Disabled</span></div>
+    </div>
+  </section>
+
+  <!-- Buttons -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Buttons</h2>
+      <span class="num">§ 03</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary">Join call</button>
+      <button class="btn btn-secondary">Cancel</button>
+      <button class="btn btn-ghost">Learn more</button>
+      <button class="btn btn-destructive">Leave room</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary"><svg><use href="#i-plus"/></svg>Create room</button>
+      <button class="btn btn-secondary">Continue<svg><use href="#i-arrow"/></svg></button>
+      <button class="btn btn-ghost"><svg><use href="#i-settings"/></svg>Settings</button>
+    </div>
+  </section>
+
+  <!-- Inputs + settings -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Forms &amp; preferences</h2>
+      <span class="num">§ 04</span>
+    </div>
+    <div class="grid-2">
+      <div class="editorial-col">
+        <h3>Room</h3>
+        <div class="field">
+          <label class="field-label">Name</label>
+          <input class="input" type="text" value="Studio · Wednesday review" />
+        </div>
+        <div class="field">
+          <label class="field-label">Server URL</label>
+          <input class="input" type="text" placeholder="wss://livekit.your-domain.com" />
+        </div>
+        <div class="field">
+          <label class="field-label">Input device</label>
+          <select class="input">
+            <option>Shure SM7B (USB)</option>
+            <option>MacBook Pro Microphone</option>
+          </select>
+        </div>
+      </div>
+      <div class="editorial-col">
+        <h3>Audio</h3>
+        <div class="pref-row">
+          <div>
+            <span class="pref-key">Noise suppression</span>
+            <span class="pref-desc">RNN model · low latency</span>
+          </div>
+          <span class="switch on"></span>
+        </div>
+        <div class="pref-row">
+          <div>
+            <span class="pref-key">Echo cancellation</span>
+            <span class="pref-desc">Recommended for speaker output</span>
+          </div>
+          <span class="switch on"></span>
+        </div>
+        <div class="pref-row">
+          <div>
+            <span class="pref-key">Push to talk</span>
+            <span class="pref-desc">Hold ⌥+Space to transmit</span>
+          </div>
+          <span class="switch"></span>
+        </div>
+        <div class="pref-row">
+          <div>
+            <span class="pref-key">Auto-gain</span>
+            <span class="pref-desc">−6 dB headroom · off by default</span>
+          </div>
+          <span class="switch"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Palette -->
+  <section class="section">
+    <div class="section-head">
+      <h2>Palette</h2>
+      <span class="num">§ 05</span>
+    </div>
+    <div class="palette">
+      <div class="swatch" style="background:hsl(240 10% 3%);"><span class="swatch-name">bg-deep</span><span class="swatch-hex">240 10 3</span></div>
+      <div class="swatch" style="background:hsl(240 10% 4%);"><span class="swatch-name">bg</span><span class="swatch-hex">240 10 4</span></div>
+      <div class="swatch" style="background:hsl(240 6% 10%);"><span class="swatch-name">elevated</span><span class="swatch-hex">240 6 10</span></div>
+      <div class="swatch" style="background:hsl(240 4% 14%);"><span class="swatch-name">muted</span><span class="swatch-hex">240 4 14</span></div>
+      <div class="swatch" style="background:hsl(240 4% 16%);"><span class="swatch-name">border</span><span class="swatch-hex">240 4 16</span></div>
+      <div class="swatch light" style="background:linear-gradient(160deg,hsl(240 6% 98%),hsl(240 6% 80%));"><span class="swatch-name">pearl</span><span class="swatch-hex">0 0 98</span></div>
+      <div class="swatch" style="background:linear-gradient(160deg,hsl(346 77% 49%),hsl(346 70% 36%));"><span class="swatch-name">destruct</span><span class="swatch-hex">346 77 49</span></div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <span>Obsidian Atelier · Theme № 01</span>
+    <a href="./index.html">← Back to gallery</a>
+  </footer>
+
+</div>
+</body>
+</html>
