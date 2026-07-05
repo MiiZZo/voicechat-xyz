@@ -39,7 +39,7 @@ Chosen over an overlay/results-view: keeps the familiar chat layout, cheap to bu
 
 ## Component state
 
-Ephemeral local `useState` in `ChatPanel` (not Zustand — resets on room change and on close, no cross-component consumers):
+Ephemeral local `useState` in `ChatPanel` (not Zustand — no cross-component consumers). It resets on close explicitly, and on leaving a room implicitly: leaving unmounts `RoomView` (there is no direct room→room switch — you always pass through the lobby), so `ChatPanel` remounts fresh. No per-`activeRoom` reset logic is needed.
 
 ```ts
 type FileCategory = 'all' | 'image' | 'audio' | 'video' | 'document' | 'other';
@@ -99,7 +99,8 @@ Semantics — **AND across all dimensions**:
 
 ## Rendering & highlight
 
-- `MessageRow` gains an optional `highlight?: string` prop (the current trimmed query, or undefined). When set, text-message body and file-name rendering wrap case-insensitive matches of `highlight` in a `<mark>` element styled per theme (muted accent background, not bright yellow). Existing `linkify` continues to run; highlight is applied so it does not break links (highlight applied within text segments).
+- `MessageRow` gains an optional `highlight?: string` prop (the current trimmed query, or undefined). When set, text-message body and file-name rendering wrap case-insensitive matches of `highlight` in a `<mark>` element styled per theme (muted accent background, not bright yellow).
+- **Composition with `linkify` is the delicate unit.** `linkify` returns a mixed `ReactNode[]` (plain strings interleaved with `<a>` link nodes). A single testable helper `highlightNodes(nodes, term)` walks that array and applies `<mark>` wrapping **only to the string segments**, leaving `<a>` nodes untouched — so highlighting never breaks or duplicates links. The same string-level helper is reused for the file `name`. This helper is pure and unit-tested independently of React rendering.
 - Filtered list uses the same `MessageRow` so bubbles, avatars, file/audio/image rendering, and context menus are unchanged.
 - Auto-scroll-to-bottom effect must not fight the filtered view: only auto-scroll on new-message growth when search is inactive.
 
@@ -109,13 +110,16 @@ When search is active and `filtered.length === 0`, replace the «Сообщен�
 
 ## Error handling / edge cases
 
-- In-flight file uploads (`status: 'uploading'`, empty `name`? — `name` is set from `file.name` at push time, so it is available) are searchable by name like any file.
+- In-flight file uploads (`status: 'uploading'`) are searchable by name like any file: `name` is set from `file.name` at push time, so it is available before the upload completes.
 - Author list is recomputed from current `chat` each render (cheap; ≤ ~200 messages). Selecting an author who then has all messages filtered out by another dimension simply yields zero results — handled by the empty state.
 - Deduping/sorting of `chat` is already handled by the store; the filter is read-only and preserves order.
 
 ## Testing
 
-- **Unit (vitest, mirroring `apps/server/test`):**
+The client (`apps/client`) has **no test runner today** — no `test` script, no vitest. The server precedent is Node's built-in test runner via `tsx`: `"test": "tsx --test test/*.test.ts"` using `node:test` (`describe`/`it`/`assert`). This design mirrors that rather than introducing vitest.
+
+- Add a `test` script to `apps/client/package.json`: `"test": "tsx --test src/renderer/lib/*.test.ts"` (tsx is available via the workspace toolchain; if not already a devDependency of the client, add it). Tests import from `.js`-suffixed paths to match the project's ESM/TS convention.
+- **Unit (`node:test` via `tsx --test`):**
   - `mimeToCategory`: image/audio/video/pdf/office/octet-stream-with-extension/unknown.
   - `filterMessages`: each dimension in isolation, AND combinations, empty-query passthrough, fileCategory ignored for text, case-insensitivity, file-name query match.
 - **Manual:** open search, type a term, switch author/type/category, verify highlight, empty state, reset-on-close, that inactive search matches current behavior, in both Electron and Tauri builds.
@@ -124,7 +128,8 @@ When search is active and `filtered.length === 0`, replace the «Сообщен�
 
 - `apps/client/src/renderer/components/ChatPanel.tsx` — search toggle, filter panel, wire filtering + highlight into the list, empty state.
 - `apps/client/src/renderer/lib/chat-search.ts` (new) — `FileCategory`, `mimeToCategory`, `filterMessages`.
-- `apps/client/src/renderer/lib/chat-search.test.ts` (new) — unit tests.
+- `apps/client/src/renderer/lib/chat-search.test.ts` (new) — unit tests (`node:test`).
+- `apps/client/package.json` — add a `test` script (`tsx --test …`); add `tsx` devDependency if the client does not already resolve it from the workspace.
 - Possibly a small themed `<mark>` style if not expressible with Tailwind utilities inline.
 
 No changes to the server, wire protocol, history store, `Prefs`, or the Tauri Rust side.
