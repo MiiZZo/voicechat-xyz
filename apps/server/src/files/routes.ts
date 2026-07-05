@@ -3,9 +3,9 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { Config } from '../config.js';
 import type { FileStore } from './file-store.js';
 import { verifyLiveKitToken } from './verify-livekit-token.js';
-import { signFileToken, verifyFileToken } from './signed-url.js';
+import { verifyFileToken } from './signed-url.js';
+import { signedFileUrl } from './file-url.js';
 
-const SIGNED_TTL_MS = 60 * 60 * 1000; // 1h
 const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,8 +47,7 @@ export function registerFileRoutes(app: AnyFastify, deps: FileRouteDeps): void {
       data: buf,
     });
 
-    const token = signFileToken(deps.config.LIVEKIT_API_SECRET, roomId, meta.id, SIGNED_TTL_MS);
-    const url = `${publicBase(req, deps.config)}/api/files/${roomId}/${meta.id}?t=${encodeURIComponent(token)}`;
+    const url = signedFileUrl(req, deps.config.LIVEKIT_API_SECRET, roomId, meta.id);
     return reply.send({
       id: meta.id,
       url,
@@ -157,17 +156,6 @@ async function authorize(
   const v = await verifyLiveKitToken(jwt, config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET);
   if (!v.ok) return { ok: false, reason: v.reason };
   return { ok: true, roomId: v.roomId, identity: v.identity };
-}
-
-function publicBase(req: FastifyRequest, _config: Config): string {
-  // Honor reverse-proxy headers (Caddy sets X-Forwarded-Proto/Host).
-  const proto =
-    (req.headers['x-forwarded-proto'] as string | undefined) ?? req.protocol ?? 'http';
-  const host =
-    (req.headers['x-forwarded-host'] as string | undefined) ??
-    (req.headers['host'] as string | undefined) ??
-    'localhost';
-  return `${proto}://${host}`;
 }
 
 // Re-export for use in unused-import-suppression / future internal callers.

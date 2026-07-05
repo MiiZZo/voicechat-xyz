@@ -10,6 +10,7 @@ import { AccessToken } from 'livekit-server-sdk';
 import type { Config } from '../src/config.js';
 import { HistoryStore, type HistoryRecord } from '../src/history/history-store.js';
 import { registerHistoryRoutes } from '../src/history/routes.js';
+import { verifyFileToken } from '../src/files/signed-url.js';
 
 const KEY = 'devkey';
 const SECRET = 'devsecret-must-be-32-chars-long-12345';
@@ -95,6 +96,60 @@ test('store: cleanupExpired rewrites file without stale records', async () => {
     const out = await store.read('lounge', { ttlMs: Number.MAX_SAFE_INTEGER, limit: 200 });
     assert.equal(out.length, 1);
     assert.equal(out[0]?.text, 'fresh');
+  } finally {
+    await app.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+function fileRecord(over: Partial<HistoryRecord> = {}): HistoryRecord {
+  return {
+    id: 'm-' + Math.random().toString(16).slice(2),
+    kind: 'file',
+    fromIdentity: 'tester#1234',
+    fromName: 'tester',
+    timestamp: Date.now(),
+    fileId: 'f-abc123',
+    // A stale/expired signed URL, as stored in history at upload time.
+    url: 'http://old-host/api/files/lounge/f-abc123?t=1.deadbeef',
+    name: 'photo.png',
+    size: 42,
+    mime: 'image/png',
+    ...over,
+  };
+}
+
+test('route: GET re-signs file URLs with a fresh valid token', async () => {
+  const { app, root } = await buildApp();
+  try {
+    const token = await makeToken('lounge');
+    const post = await app.inject({
+      method: 'POST',
+      url: '/api/history/lounge',
+      headers: { authorization: `Bearer ${token}` },
+      payload: fileRecord(),
+    });
+    assert.equal(post.statusCode, 200, post.body);
+
+    const get = await app.inject({
+      method: 'GET',
+      url: '/api/history/lounge',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    assert.equal(get.statusCode, 200);
+    const list = get.json() as HistoryRecord[];
+    assert.equal(list.length, 1);
+    const rec = list[0];
+    assert.equal(rec?.kind, 'file');
+
+    // The returned URL must carry a freshly-signed, currently-valid token
+    // for the record's fileId — not the 1h-expired one persisted at upload.
+    const u = new URL(rec!.url!);
+    assert.match(u.pathname, /\/api\/files\/lounge\/f-abc123$/);
+    const t = u.searchParams.get('t');
+    assert.ok(t, 'expected a token query param');
+    const v = verifyFileToken(SECRET, 'lounge', 'f-abc123', t!);
+    assert.equal(v.ok, true);
   } finally {
     await app.close();
     await rm(root, { recursive: true, force: true });

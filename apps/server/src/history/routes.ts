@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Config } from '../config.js';
 import { authorizeRoom } from '../authorize.js';
 import type { HistoryStore, HistoryRecord } from './history-store.js';
+import { signedFileUrl } from '../files/file-url.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFastify = FastifyInstance<any, any, any, any>;
@@ -64,6 +65,15 @@ export function registerHistoryRoutes(app: AnyFastify, deps: HistoryRouteDeps): 
     if (auth.roomId !== roomId) return reply.code(403).send({ error: 'token room mismatch' });
 
     const records = await deps.store.read(roomId, { ttlMs, limit: LOAD_LIMIT });
-    return reply.send(records);
+    // Re-sign file URLs on read: the token minted at upload time is short-lived
+    // (SIGNED_TTL_MS), but history is served for days. Rebuild from the canonical
+    // fileId so stored-stale tokens never reach the client. The blob still lives
+    // for UPLOAD_TTL_HOURS, so a freshly-signed URL always resolves.
+    const signed = records.map((r) =>
+      r.kind === 'file' && r.fileId
+        ? { ...r, url: signedFileUrl(req, deps.config.LIVEKIT_API_SECRET, roomId, r.fileId) }
+        : r,
+    );
+    return reply.send(signed);
   });
 }
