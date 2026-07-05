@@ -1,10 +1,25 @@
-import { useEffect, useRef, useState, type ReactNode, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type DragEvent } from 'react';
 import { RoomEvent, type Room, type RemoteParticipant } from 'livekit-client';
-import { ArrowUp, Copy, ClipboardCopy, Paperclip, Download, Loader2, AlertCircle, X, File as FileIcon, Upload } from 'lucide-react';
+import { ArrowUp, Copy, ClipboardCopy, Paperclip, Download, Loader2, AlertCircle, X, File as FileIcon, Upload, Search } from 'lucide-react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { useStore, type ChatMessage, type FileMessage } from '../state/store.js';
 import { Avatar, AvatarFallback, AvatarImage, avatarColor, customAvatar } from './ui/avatar.js';
 import { Input } from './ui/input.js';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select.js';
+import {
+  filterMessages,
+  isSearchActive,
+  splitHighlight,
+  type FileCategory,
+  type ContentType,
+  type SearchFilters,
+} from '../lib/chat-search.js';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -97,6 +112,37 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
+/** Russian plural selector: one/few/many (e.g. 1 совпадение, 2 совпадения, 5 совпадений). */
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+/** Wrap case-insensitive matches of `term` in <mark>, but only within the
+ *  string parts of a linkify()'d node list — <a> link nodes pass through
+ *  untouched so highlighting never breaks links. */
+function highlightNodes(nodes: ReactNode[], term?: string): ReactNode[] {
+  if (!term) return nodes;
+  return nodes.map((node, i) => {
+    if (typeof node !== 'string') return node;
+    return splitHighlight(node, term).map((seg, j) =>
+      seg.match ? (
+        <mark
+          key={`${i}-${j}`}
+          className="rounded-[3px] bg-white/[0.18] px-0.5 text-fg"
+        >
+          {seg.text}
+        </mark>
+      ) : (
+        <span key={`${i}-${j}`}>{seg.text}</span>
+      ),
+    );
+  });
+}
+
 export function ChatPanel({ room }: { room: Room }) {
   const { chat, pushChat, patchChat, seedHistory, activeRoom } = useStore();
   const [text, setText] = useState('');
@@ -105,6 +151,36 @@ export function ChatPanel({ room }: { room: Room }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const { push: pushToast } = useToasts();
+
+  // --- Search / filters (ephemeral UI state — resets on close and on room
+  // change via remount). See docs/superpowers/specs/2026-07-05-chat-search-filters-design.md
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [author, setAuthor] = useState<string | null>(null);
+  const [contentType, setContentType] = useState<ContentType>('all');
+  const [fileCategory, setFileCategory] = useState<FileCategory>('all');
+
+  const filters: SearchFilters = { query, author, contentType, fileCategory };
+  const active = isSearchActive(filters);
+  const visibleChat = active ? filterMessages(chat, filters) : chat;
+
+  const resetFilters = () => {
+    setQuery('');
+    setAuthor(null);
+    setContentType('all');
+    setFileCategory('all');
+  };
+  const closeSearch = () => {
+    setSearchOpen(false);
+    resetFilters();
+  };
+
+  // Distinct authors present in the loaded chat, for the Author dropdown.
+  const authorOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const m of chat) if (!seen.has(m.fromIdentity)) seen.set(m.fromIdentity, m.fromName);
+    return [...seen.entries()].map(([identity, name]) => ({ identity, name }));
+  }, [chat]);
 
   useEffect(() => {
     const onData = (data: Uint8Array, participant?: RemoteParticipant) => {
@@ -154,8 +230,10 @@ export function ChatPanel({ room }: { room: Room }) {
   }, [room, pushChat]);
 
   useEffect(() => {
+    // Don't yank the view while the user is scanning filtered results.
+    if (active) return;
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [chat.length, chat]);
+  }, [chat.length, chat, active]);
 
   // Load persisted room history on entering a room. Best-effort: a failure
   // leaves the chat empty rather than blocking. seedHistory merges with any
@@ -341,19 +419,151 @@ export function ChatPanel({ room }: { room: Room }) {
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      <div className="relative flex items-baseline justify-center gap-2 px-4 py-3.5 after:absolute after:bottom-0 after:left-5 after:right-5 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/10 after:to-transparent after:content-['']">
+      <div className="relative flex items-center justify-center px-4 py-3.5 after:absolute after:bottom-0 after:left-5 after:right-5 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/10 after:to-transparent after:content-['']">
         <span className="text-sm font-semibold tracking-tight text-fg">Чат</span>
+        <button
+          type="button"
+          aria-label={searchOpen ? 'Закрыть поиск' : 'Поиск в чате'}
+          aria-pressed={searchOpen}
+          onClick={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+          className={cn(
+            'absolute right-3 flex h-7 w-7 items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-white/[0.06] hover:text-fg focus:outline-none focus-visible:ring-1 focus-visible:ring-white/20',
+            searchOpen && 'bg-white/[0.06] text-fg',
+          )}
+        >
+          {searchOpen ? <X size={14} strokeWidth={2.25} /> : <Search size={14} strokeWidth={2.25} />}
+        </button>
       </div>
 
+      {searchOpen && (
+        <div className="flex flex-col gap-2 border-b border-white/[0.06] px-3 py-2.5 animate-in fade-in-0 slide-in-from-top-1 duration-150">
+          <div className="relative">
+            <Search
+              size={13}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle"
+            />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Поиск в чате…"
+              autoFocus
+              className="h-8 rounded-md pl-8 pr-8 text-[13px]"
+            />
+            {query && (
+              <button
+                type="button"
+                aria-label="Очистить"
+                onClick={() => setQuery('')}
+                className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-fg-subtle transition-colors hover:bg-white/[0.06] hover:text-fg"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Select
+              value={author ?? '__all__'}
+              onValueChange={(v) => setAuthor(v === '__all__' ? null : v)}
+            >
+              <SelectTrigger className="h-8 flex-1 text-[12px]">
+                <SelectValue placeholder="Автор" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Все авторы</SelectItem>
+                {authorOptions.map((a) => (
+                  <SelectItem key={a.identity} value={a.identity}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={fileCategory}
+              onValueChange={(v) => setFileCategory(v as FileCategory)}
+              disabled={contentType === 'text'}
+            >
+              <SelectTrigger className="h-8 flex-1 text-[12px]">
+                <SelectValue placeholder="Файлы" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все файлы</SelectItem>
+                <SelectItem value="image">Изображения</SelectItem>
+                <SelectItem value="audio">Аудио</SelectItem>
+                <SelectItem value="video">Видео</SelectItem>
+                <SelectItem value="document">Документы</SelectItem>
+                <SelectItem value="other">Прочее</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex gap-1 rounded-md border border-white/[0.08] p-0.5">
+            {(
+              [
+                ['all', 'Все'],
+                ['text', 'Текст'],
+                ['file', 'Файлы'],
+              ] as const
+            ).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => {
+                  setContentType(val);
+                  if (val === 'text') setFileCategory('all');
+                }}
+                className={cn(
+                  'flex-1 rounded px-2 py-1 text-[11.5px] font-medium transition-colors',
+                  contentType === val
+                    ? 'bg-white/[0.10] text-fg'
+                    : 'text-fg-subtle hover:text-fg-muted',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Only the positive count lives here; the zero-results message is
+              owned by the list's empty state to avoid showing it twice. */}
+          {active && visibleChat.length > 0 && (
+            <div className="px-0.5 text-[11px] text-fg-subtle">
+              {`${visibleChat.length} ${plural(visibleChat.length, 'совпадение', 'совпадения', 'совпадений')}`}
+            </div>
+          )}
+        </div>
+      )}
+
       <div ref={listRef} className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-        {chat.length === 0 && (
+        {visibleChat.length === 0 && (
           <div className="my-auto text-center text-xs text-fg-subtle">
-            Сообщений пока нет
+            {active ? (
+              <div className="flex flex-col items-center gap-2">
+                <span>Ничего не найдено</span>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-[11px] text-fg-muted transition-colors hover:bg-white/[0.08] hover:text-fg"
+                >
+                  Сбросить фильтры
+                </button>
+              </div>
+            ) : (
+              'Сообщений пока нет'
+            )}
           </div>
         )}
-        {chat.map((m) => {
+        {visibleChat.map((m) => {
           const isLocal = m.fromIdentity === room.localParticipant.identity;
-          return <MessageRow key={m.id} message={m} isLocal={isLocal} />;
+          return (
+            <MessageRow
+              key={m.id}
+              message={m}
+              isLocal={isLocal}
+              highlight={active ? query.trim() : undefined}
+            />
+          );
         })}
       </div>
 
@@ -430,7 +640,15 @@ export function ChatPanel({ room }: { room: Room }) {
   );
 }
 
-function MessageRow({ message, isLocal }: { message: ChatMessage; isLocal: boolean }) {
+function MessageRow({
+  message,
+  isLocal,
+  highlight,
+}: {
+  message: ChatMessage;
+  isLocal: boolean;
+  highlight?: string;
+}) {
   const { push } = useToasts();
 
   const copyMessage = async () => {
@@ -486,10 +704,10 @@ function MessageRow({ message, isLocal }: { message: ChatMessage; isLocal: boole
                     : 'vo-lift-bubble border border-white/[0.08] bg-white/[0.06] text-fg backdrop-blur-xl backdrop-saturate-150 rounded-tl-sm',
                 )}
               >
-                <span className="whitespace-pre-wrap">{linkify(message.text)}</span>
+                <span className="whitespace-pre-wrap">{highlightNodes(linkify(message.text), highlight)}</span>
               </div>
             ) : (
-              <FileBubble message={message} isLocal={isLocal} />
+              <FileBubble message={message} isLocal={isLocal} highlight={highlight} />
             )}
           </div>
         </div>
@@ -522,7 +740,15 @@ function MessageRow({ message, isLocal }: { message: ChatMessage; isLocal: boole
   );
 }
 
-function FileBubble({ message, isLocal }: { message: FileMessage; isLocal: boolean }) {
+function FileBubble({
+  message,
+  isLocal,
+  highlight,
+}: {
+  message: FileMessage;
+  isLocal: boolean;
+  highlight?: string;
+}) {
   const { push } = useToasts();
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const isImage = message.mime.startsWith('image/');
@@ -611,7 +837,7 @@ function FileBubble({ message, isLocal }: { message: FileMessage; isLocal: boole
           className={cn('truncate text-[13px] font-medium [overflow-wrap:anywhere]', isLocal ? 'text-bg' : 'text-fg')}
           title={message.name}
         >
-          {message.name}
+          {highlightNodes([message.name], highlight)}
         </span>
         <span className={cn('font-mono text-[11px] tracking-[0.02em]', isLocal ? 'text-bg/55' : 'text-fg-subtle')}>
           {errored
@@ -645,8 +871,7 @@ function FileBubble({ message, isLocal }: { message: FileMessage; isLocal: boole
 
 function extOf(name: string): string {
   const m = /\.([^./\\]+)$/.exec(name);
-  if (!m) return 'FILE';
-  return m[1].slice(0, 4).toUpperCase();
+  return m?.[1]?.slice(0, 4).toUpperCase() ?? 'FILE';
 }
 
 /** Velvet Onyx file glyph: small glass plaque with a clipped top-right corner +
