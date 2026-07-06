@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Play,
   Pause,
@@ -22,7 +23,12 @@ let sharedVideoVolume = 1;
 const HIDE_CONTROLS_MS = 2500;
 
 /** Полноценный видеоплеер для чата в стиле Velvet Onyx: инлайн в пузыре + полный
- *  экран (Fullscreen API — тот же элемент, воспроизведение не прерывается).
+ *  экран. Полный экран — оверлей через createPortal(document.body) + fixed
+ *  inset-0, а НЕ нативный Fullscreen API: WebView2 (Tauri) и frameless-окна
+ *  Electron его не поддерживают, а прямой fixed внутри чата обрезался бы
+ *  backdrop-filter-контейнером .vo-chat-bg. Тот же приём, что у ImageLightbox.
+ *  Портал пере-монтирует <video>, поэтому позиция/состояние воспроизведения
+ *  восстанавливаются через resumeRef, а слушатели пере-навешиваются по isFullscreen.
  *  Play/pause, перемотка, громкость, таймкод, скорость, скачивание, клавиши, и
  *  превью-кадр при наведении на полосу (в полноэкранном режиме). При ошибке
  *  декодирования (mkv/avi/неподдерживаемый кодек) зовёт onError — FileBubble
@@ -44,6 +50,9 @@ export function VideoBubble({
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const hideTimerRef = useRef<number | null>(null);
   const posteredRef = useRef(false);
+  // Позиция/состояние для восстановления после ре-монтажа <video> при
+  // переключении полноэкранного портала.
+  const resumeRef = useRef<{ time: number; playing: boolean } | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
@@ -58,15 +67,26 @@ export function VideoBubble({
   const [rateOpen, setRateOpen] = useState(false);
   const [preview, setPreview] = useState<{ x: number; time: number } | null>(null);
 
-  // Слушатели событий видеоэлемента.
+  // Слушатели событий видеоэлемента. Зависит от isFullscreen: при переключении
+  // портала <video> пере-монтируется, и эффект перевешивает слушатели на новый
+  // элемент, а заодно восстанавливает громкость/скорость/позицию.
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    const onLoadedMeta = () => {
-      setDuration(video.duration);
-      // Показать первый кадр как постер: короткий seek подгружает картинку
-      // (preload="metadata" сам по себе часто оставляет чёрный кадр).
-      if (!posteredRef.current) {
+    // Применить постер (первый кадр) или восстановить позицию после ре-монтажа.
+    const applyPoster = () => {
+      const resume = resumeRef.current;
+      if (resume) {
+        try {
+          video.currentTime = resume.time;
+        } catch {
+          /* ignore */
+        }
+        if (resume.playing) void video.play().catch(() => undefined);
+        resumeRef.current = null;
+      } else if (!posteredRef.current) {
+        // Короткий seek подгружает картинку (preload="metadata" сам по себе
+        // часто оставляет чёрный кадр).
         posteredRef.current = true;
         try {
           video.currentTime = Math.min(0.1, video.duration || 0.1);
@@ -74,6 +94,10 @@ export function VideoBubble({
           /* ignore */
         }
       }
+    };
+    const onLoadedMeta = () => {
+      setDuration(video.duration);
+      applyPoster();
     };
     const onTimeUpdate = () => setCurrentTime(video.currentTime);
     const onPlay = () => {
@@ -92,6 +116,15 @@ export function VideoBubble({
     video.addEventListener('pause', onPause);
     video.addEventListener('ended', onEnded);
     video.addEventListener('error', onError);
+    // Применяем сессионные настройки к (пере)смонтированному элементу.
+    video.volume = volume;
+    video.muted = muted;
+    video.playbackRate = rate;
+    // Метаданные уже могли загрузиться (кэш) — тогда loadedmetadata не сработает.
+    if (video.readyState >= 1) {
+      setDuration(video.duration);
+      applyPoster();
+    }
     return () => {
       video.removeEventListener('loadedmetadata', onLoadedMeta);
       video.removeEventListener('timeupdate', onTimeUpdate);
@@ -100,7 +133,9 @@ export function VideoBubble({
       video.removeEventListener('ended', onEnded);
       video.removeEventListener('error', onError);
     };
-  }, [onError]);
+    // volume/muted/rate намеренно НЕ в зависимостях — их применяют отдельные
+    // эффекты ниже; здесь мы лишь синхронизируем свежесмонтированный элемент.
+  }, [onError, isFullscreen]);
 
   // Применяем громкость/mute к элементу и запоминаем на сессию.
   useEffect(() => {
@@ -116,14 +151,10 @@ export function VideoBubble({
     if (videoRef.current) videoRef.current.playbackRate = rate;
   }, [rate]);
 
-  // Отслеживаем вход/выход из полноэкранного режима (в т.ч. по Esc).
+  // Фокус на плеере при входе в полноэкранный режим — чтобы работали клавиши.
   useEffect(() => {
-    const onFsChange = () => {
-      setIsFullscreen(document.fullscreenElement === containerRef.current);
-    };
-    document.addEventListener('fullscreenchange', onFsChange);
-    return () => document.removeEventListener('fullscreenchange', onFsChange);
-  }, []);
+    if (isFullscreen) containerRef.current?.focus();
+  }, [isFullscreen]);
 
   const clearHideTimer = () => {
     if (hideTimerRef.current !== null) {
@@ -164,14 +195,13 @@ export function VideoBubble({
     setCurrentTime(video.currentTime);
   }, []);
 
+  // Полный экран — оверлей через портал (см. док-строку компонента). Перед
+  // переключением запоминаем позицию, чтобы пере-смонтированный <video>
+  // продолжил с того же места.
   const toggleFullscreen = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    if (document.fullscreenElement === el) {
-      void document.exitFullscreen().catch(() => undefined);
-    } else {
-      void el.requestFullscreen().catch(() => undefined);
-    }
+    const v = videoRef.current;
+    if (v) resumeRef.current = { time: v.currentTime, playing: !v.paused };
+    setIsFullscreen((f) => !f);
   }, []);
 
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
@@ -238,6 +268,12 @@ export function VideoBubble({
         e.preventDefault();
         toggleMute();
         break;
+      case 'Escape':
+        if (isFullscreen) {
+          e.preventDefault();
+          toggleFullscreen();
+        }
+        break;
       default:
         break;
     }
@@ -251,7 +287,7 @@ export function VideoBubble({
   const iconBtn =
     'flex items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/15 hover:text-white';
 
-  return (
+  const player = (
     <div
       ref={containerRef}
       tabIndex={0}
@@ -263,7 +299,7 @@ export function VideoBubble({
       className={cn(
         'group relative overflow-hidden outline-none',
         isFullscreen
-          ? 'flex h-full w-full items-center justify-center bg-black'
+          ? 'fixed inset-0 z-50 flex items-center justify-center bg-black'
           : cn(
               'vo-lift-bubble w-fit max-w-full rounded-2xl border border-white/[0.08] bg-black/40 backdrop-blur-xl',
               isLocal ? 'rounded-tr-sm' : 'rounded-tl-sm',
@@ -460,4 +496,8 @@ export function VideoBubble({
       </div>
     </div>
   );
+
+  // Полноэкранный оверлей рендерим в body, чтобы выйти из backdrop-filter
+  // контейнера чата (.vo-chat-bg), иначе fixed обрезался бы шириной панели.
+  return isFullscreen ? createPortal(player, document.body) : player;
 }
