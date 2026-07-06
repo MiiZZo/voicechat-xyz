@@ -366,22 +366,27 @@ export function VideoBubble({
           controlsVisible ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
       >
-        <Bar
-          fraction={progress}
-          onScrub={seekToFraction}
-          isLocal={false}
-          ariaLabel="Перемотка"
-          onHover={
-            isFullscreen && Number.isFinite(duration)
-              ? (frac, clientX) => {
-                  const rect = containerRef.current?.getBoundingClientRect();
-                  const x = rect ? clientX - rect.left : clientX;
-                  setPreview({ x, time: clampFraction(frac) * duration });
-                }
-              : undefined
-          }
-          onLeave={isFullscreen ? () => setPreview(null) : undefined}
-        />
+        {/* Обёртка-строка обязательна: у Bar `flex-1` (заточен под ряд в
+            AudioBubble). Без ряда, будучи прямым ребёнком flex-col, он растёт по
+            вертикали с flex-basis:0 и схлопывается в 0px высоты. */}
+        <div className="flex items-center">
+          <Bar
+            fraction={progress}
+            onScrub={seekToFraction}
+            isLocal={false}
+            ariaLabel="Перемотка"
+            onHover={
+              isFullscreen && Number.isFinite(duration)
+                ? (frac, clientX) => {
+                    const rect = containerRef.current?.getBoundingClientRect();
+                    const x = rect ? clientX - rect.left : clientX;
+                    setPreview({ x, time: clampFraction(frac) * duration });
+                  }
+                : undefined
+            }
+            onLeave={isFullscreen ? () => setPreview(null) : undefined}
+          />
+        </div>
 
         <div className="flex items-center gap-2">
           <button
