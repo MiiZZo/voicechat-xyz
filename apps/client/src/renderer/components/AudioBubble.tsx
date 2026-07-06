@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Download, Volume2, Volume1, VolumeX } from 'lucide-react';
 import type { FileMessage } from '../state/store.js';
 import { cn } from '../lib/cn.js';
+import { formatTime } from '../lib/media.js';
+import { Bar } from './media-controls.js';
 
 /** Расширения, которые считаем аудио даже когда mime приходит как
  *  application/octet-stream (сервер не всегда угадывает тип при загрузке). */
@@ -17,72 +19,6 @@ let sharedVolume = 1;
  *  FileBubble только для готовых (status='done') сообщений с непустым url. */
 export function isAudioMessage(message: FileMessage): boolean {
   return message.mime.startsWith('audio/') || AUDIO_EXT_RE.test(message.name);
-}
-
-function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
-  const total = Math.floor(seconds);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-/** Кликабельная/перетаскиваемая полоса 0..1 в стиле Velvet Onyx. Использована и
- *  для перемотки, и для громкости — общий вид для local (жемчужный) и remote
- *  (стеклянный) пузырьков. Pointer capture даёт плавный drag за пределами бара. */
-function Bar({
-  fraction,
-  onScrub,
-  isLocal,
-  ariaLabel,
-}: {
-  fraction: number;
-  onScrub: (fraction: number) => void;
-  isLocal: boolean;
-  ariaLabel: string;
-}) {
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  const fractionAt = (clientX: number): number => {
-    const el = ref.current;
-    if (!el) return 0;
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0) return 0;
-    return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-  };
-
-  const width = `${Math.min(1, Math.max(0, fraction)) * 100}%`;
-
-  return (
-    <div
-      ref={ref}
-      role="slider"
-      aria-label={ariaLabel}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(Math.min(1, Math.max(0, fraction)) * 100)}
-      onPointerDown={(e) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        onScrub(fractionAt(e.clientX));
-      }}
-      onPointerMove={(e) => {
-        // e.buttons === 1 → тянут с зажатой кнопкой.
-        if (e.buttons === 1) onScrub(fractionAt(e.clientX));
-      }}
-      className={cn(
-        'relative h-1.5 flex-1 cursor-pointer touch-none rounded-full',
-        isLocal ? 'bg-black/15' : 'bg-white/[0.12]',
-      )}
-    >
-      <div
-        className={cn(
-          'pointer-events-none absolute inset-y-0 left-0 rounded-full',
-          isLocal ? 'bg-bg/70' : 'bg-white/70',
-        )}
-        style={{ width }}
-      />
-    </div>
-  );
 }
 
 /** Компактный inline-плеер для аудиофайлов в чате: play/pause, перемотка,

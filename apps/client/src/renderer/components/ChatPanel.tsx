@@ -15,6 +15,7 @@ import {
 import {
   filterMessages,
   isSearchActive,
+  isVideoMessage,
   splitHighlight,
   type FileCategory,
   type ContentType,
@@ -31,6 +32,7 @@ import { cn } from '../lib/cn.js';
 import { uploadFile } from '../lib/upload.js';
 import { notifyChatMessage } from '../lib/notifications.js';
 import { AudioBubble, isAudioMessage } from './AudioBubble.js';
+import { VideoBubble } from './VideoBubble.js';
 import { fetchHistory, postHistory, type HistoryRecord } from '../lib/history.js';
 
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -751,6 +753,9 @@ function FileBubble({
 }) {
   const { push } = useToasts();
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  // Видео, которое Chromium не смог декодировать (mkv/avi/неизвестный кодек),
+  // откатываем на обычный файловый пузырёк.
+  const [videoFailed, setVideoFailed] = useState(false);
   const isImage = message.mime.startsWith('image/');
   const uploading = message.status === 'uploading';
   const errored = message.status === 'error';
@@ -813,6 +818,23 @@ function FileBubble({
           />
         )}
       </>
+    );
+  }
+
+  if (
+    isVideoMessage(message.mime, message.name) &&
+    !errored &&
+    !uploading &&
+    message.url &&
+    !videoFailed
+  ) {
+    return (
+      <VideoBubble
+        message={message}
+        isLocal={isLocal}
+        onDownload={handleDownload}
+        onError={() => setVideoFailed(true)}
+      />
     );
   }
 

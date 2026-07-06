@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   mimeToCategory,
+  isVideoMessage,
   filterMessages,
   isSearchActive,
   splitHighlight,
@@ -36,6 +37,23 @@ describe('mimeToCategory', () => {
   it('maps unknown binaries to other', () => {
     assert.equal(mimeToCategory('application/zip', 'a.zip'), 'other');
     assert.equal(mimeToCategory('application/octet-stream', 'game.exe'), 'other');
+  });
+});
+
+describe('isVideoMessage', () => {
+  it('matches video/* mime regardless of name', () => {
+    assert.equal(isVideoMessage('video/mp4', 'clip.bin'), true);
+    assert.equal(isVideoMessage('video/webm', 'rec'), true);
+  });
+  it('falls back to a video extension for generic mime', () => {
+    assert.equal(isVideoMessage('application/octet-stream', 'movie.mp4'), true);
+    assert.equal(isVideoMessage('', 'trailer.MOV'), true);
+    assert.equal(isVideoMessage('application/octet-stream', 'clip.webm'), true);
+  });
+  it('rejects non-video files', () => {
+    assert.equal(isVideoMessage('image/png', 'a.png'), false);
+    assert.equal(isVideoMessage('audio/mpeg', 'song.mp3'), false);
+    assert.equal(isVideoMessage('application/octet-stream', 'archive.zip'), false);
   });
 });
 

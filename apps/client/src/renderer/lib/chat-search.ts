@@ -46,6 +46,18 @@ export function mimeToCategory(mime: string, name: string): Exclude<FileCategory
   return 'other';
 }
 
+/** Video containers Chromium will usually attempt to play. Used as a fallback
+ *  when the server reports a generic mime (application/octet-stream). Unplayable
+ *  codecs still fall back to the download bubble via the <video> error event. */
+const VIDEO_EXTS = new Set(['mp4', 'webm', 'm4v', 'mov', 'ogv']);
+
+/** True when a file message should be shown with the video player. Mirrors
+ *  {@link isAudioMessage}: mime `video/*`, or a video extension when the mime is
+ *  generic. */
+export function isVideoMessage(mime: string, name: string): boolean {
+  return mime.startsWith('video/') || VIDEO_EXTS.has(extOf(name));
+}
+
 export function isSearchActive(f: SearchFilters): boolean {
   return (
     f.query.trim() !== '' ||
