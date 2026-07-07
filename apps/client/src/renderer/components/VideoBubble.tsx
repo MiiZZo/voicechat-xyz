@@ -22,6 +22,15 @@ let sharedVideoVolume = 1;
 
 const HIDE_CONTROLS_MS = 2500;
 
+/** Сколько раз пере-грузить видео после ошибки загрузки прежде чем сдаться и
+ *  показать файловый пузырёк. Транзиентные сбои (сеть/подпись URL) чинятся
+ *  ре-лоадом; реально непроигрываемый контейнер (mkv/avi) падает каждый раз. */
+const MAX_LOAD_RETRIES = 3;
+
+/** Контейнеры, которые Chromium обычно проигрывает — используем как «заведомо
+ *  играбельно», когда сервер прислал generic mime (canPlayType вернул ''). */
+const PLAYABLE_EXT_RE = /\.(mp4|webm|m4v|ogv|mov)$/i;
+
 /** Полноценный видеоплеер для чата в стиле Velvet Onyx: инлайн в пузыре + полный
  *  экран. Полный экран — оверлей через createPortal(document.body) + fixed
  *  inset-0, а НЕ нативный Fullscreen API: WebView2 (Tauri) и frameless-окна
@@ -53,6 +62,8 @@ export function VideoBubble({
   // Позиция/состояние для восстановления после ре-монтажа <video> при
   // переключении полноэкранного портала.
   const resumeRef = useRef<{ time: number; playing: boolean } | null>(null);
+  const retryRef = useRef(0);
+  const retryTimerRef = useRef<number | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
@@ -96,6 +107,7 @@ export function VideoBubble({
       }
     };
     const onLoadedMeta = () => {
+      retryRef.current = 0; // успешно загрузились — сбрасываем счётчик ретраев
       setDuration(video.duration);
       applyPoster();
     };
@@ -110,12 +122,39 @@ export function VideoBubble({
       setCurrentTime(0);
       video.currentTime = 0;
     };
+    // Chromium репортит MEDIA_ERR_SRC_NOT_SUPPORTED (4) и на реально
+    // непроигрываемый контейнер, И на транзиентный сбой загрузки подписанного
+    // URL (404/refused/сеть) — по коду их не различить. Поэтому: код != 4
+    // (abort при перемонтаже, сетевой обрыв уже игравшего) игнорируем; на код 4
+    // при заведомо играбельном формате пробуем пере-загрузиться несколько раз
+    // (транзиент чинится), и только если формат непроигрываем ИЛИ ретраи
+    // исчерпаны — откатываемся на файловый пузырёк. Это убирает мерцание
+    // плеер↔файл при периодических сетевых сбоях.
+    const onErr = () => {
+      if (video.error?.code !== MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) return;
+      const declaredPlayable =
+        video.canPlayType(message.mime) !== '' || PLAYABLE_EXT_RE.test(message.name);
+      if (declaredPlayable && retryRef.current < MAX_LOAD_RETRIES) {
+        retryRef.current += 1;
+        // Если ошибка застала воспроизведение — вернёмся на ту же позицию после
+        // ре-лоада (для ошибки на маунте не трогаем, чтобы сохранить постер).
+        if (video.currentTime > 0 || !video.paused) {
+          resumeRef.current = { time: video.currentTime, playing: !video.paused };
+        }
+        if (retryTimerRef.current !== null) window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = window.setTimeout(() => {
+          videoRef.current?.load();
+        }, 500 * retryRef.current);
+      } else {
+        onError();
+      }
+    };
     video.addEventListener('loadedmetadata', onLoadedMeta);
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
     video.addEventListener('ended', onEnded);
-    video.addEventListener('error', onError);
+    video.addEventListener('error', onErr);
     // Применяем сессионные настройки к (пере)смонтированному элементу.
     video.volume = volume;
     video.muted = muted;
@@ -131,7 +170,11 @@ export function VideoBubble({
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
       video.removeEventListener('ended', onEnded);
-      video.removeEventListener('error', onError);
+      video.removeEventListener('error', onErr);
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
     };
     // volume/muted/rate намеренно НЕ в зависимостях — их применяют отдельные
     // эффекты ниже; здесь мы лишь синхронизируем свежесмонтированный элемент.
