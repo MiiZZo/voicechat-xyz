@@ -42,6 +42,7 @@ import {
 } from './ui/select.js';
 import { Button } from './ui/button.js';
 import { Slider } from './ui/slider.js';
+import { ErrorBoundary } from './ErrorBoundary.js';
 import {
   Tooltip,
   TooltipContent,
@@ -174,225 +175,234 @@ export function SettingsModal({ open, onOpenChange }: Props) {
               className="animate-in fade-in-0 slide-in-from-bottom-1.5 duration-[250ms] px-8 pb-8 pt-7"
             >
               <ContentHeader tab={current} />
-              <div className="mt-2 flex flex-col">
-                {activeTab === 'devices' && (
-                  <>
-                    <DeviceField
-                      label="Микрофон"
-                      devices={devices.audioInputs}
-                      value={prefs.audioInputDeviceId}
-                      onChange={(v) => update({ audioInputDeviceId: v })}
-                    />
-                    <DeviceField
-                      label="Камера"
-                      devices={devices.videoInputs}
-                      value={prefs.videoInputDeviceId}
-                      onChange={(v) => update({ videoInputDeviceId: v })}
-                    />
-                    <DeviceField
-                      label="Динамики"
-                      devices={devices.audioOutputs}
-                      value={prefs.audioOutputDeviceId}
-                      onChange={(v) => update({ audioOutputDeviceId: v })}
-                      action={<SpeakerTestButton deviceId={prefs.audioOutputDeviceId} />}
-                    />
-                  </>
-                )}
-
-                {activeTab === 'mic' && (
-                  <>
-                    <Block
-                      title="Когда передавать голос"
-                      desc="Выбери, что должно открывать твой микрофон в эфир."
-                    >
-                      <ModePicker mode={prefs.micActivationMode} onChange={setMode} />
-                    </Block>
-                    {prefs.micActivationMode === 'ptt' && (
-                      <div className="flex items-center justify-between gap-6 border-b border-white/[0.05] py-4 last:border-b-0">
-                        <span className="text-[13px] font-medium text-fg">Клавиша push-to-talk</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={captureKey}
-                          className="font-mono text-xs"
+              {/* Ошибка рендера раздела не должна ронять всё приложение
+                  (чёрный экран посреди звонка) — гасим её здесь. key сбрасывает
+                  предохранитель при переключении вкладки. */}
+              <ErrorBoundary
+                key={activeTab}
+                label={`settings:${activeTab}`}
+                fallback={(error, reset) => <TabCrashFallback error={error} onRetry={reset} />}
+              >
+                <div className="mt-2 flex flex-col">
+                  {activeTab === 'devices' && (
+                    <>
+                      <DeviceField
+                        label="Микрофон"
+                        devices={devices.audioInputs}
+                        value={prefs.audioInputDeviceId}
+                        onChange={(v) => update({ audioInputDeviceId: v })}
+                      />
+                      <DeviceField
+                        label="Камера"
+                        devices={devices.videoInputs}
+                        value={prefs.videoInputDeviceId}
+                        onChange={(v) => update({ videoInputDeviceId: v })}
+                      />
+                      <DeviceField
+                        label="Динамики"
+                        devices={devices.audioOutputs}
+                        value={prefs.audioOutputDeviceId}
+                        onChange={(v) => update({ audioOutputDeviceId: v })}
+                        action={<SpeakerTestButton deviceId={prefs.audioOutputDeviceId} />}
+                      />
+                    </>
+                  )}
+  
+                  {activeTab === 'mic' && (
+                    <>
+                      <Block
+                        title="Когда передавать голос"
+                        desc="Выбери, что должно открывать твой микрофон в эфир."
+                      >
+                        <ModePicker mode={prefs.micActivationMode} onChange={setMode} />
+                      </Block>
+                      {prefs.micActivationMode === 'ptt' && (
+                        <div className="flex items-center justify-between gap-6 border-b border-white/[0.05] py-4 last:border-b-0">
+                          <span className="text-[13px] font-medium text-fg">Клавиша push-to-talk</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={captureKey}
+                            className="font-mono text-xs"
+                          >
+                            <Keyboard />
+                            {capturing ? 'Нажмите клавишу…' : prefs.pushToTalk.key}
+                          </Button>
+                        </div>
+                      )}
+                      {prefs.micActivationMode === 'vad' && (
+                        <VadSection prefs={prefs} update={update} />
+                      )}
+                    </>
+                  )}
+  
+                  {activeTab === 'hotkeys' && (
+                    <>
+                      <HotkeyField
+                        label="Выключить / включить микрофон"
+                        value={prefs.globalShortcutToggleMute}
+                        onChange={(v) => update({ globalShortcutToggleMute: v })}
+                      />
+                      <HotkeyField
+                        label="Покинуть комнату"
+                        value={prefs.globalShortcutLeaveRoom}
+                        onChange={(v) => update({ globalShortcutLeaveRoom: v })}
+                      />
+                      <p className="text-[11px] leading-relaxed text-fg-subtle">
+                        Минимум один
+                        модификатор (Ctrl / Alt / Shift) обязателен. Escape во
+                        время захвата — очистить.
+                      </p>
+                    </>
+                  )}
+  
+                  {activeTab === 'audio' && (
+                    <>
+                      <Toggle
+                        label="Эхоподавление"
+                        desc="Убирает эхо, когда звук идёт через колонки."
+                        checked={prefs.audioConstraints.echoCancellation}
+                        onChange={(v) =>
+                          update({
+                            audioConstraints: { ...prefs.audioConstraints, echoCancellation: v },
+                          })
+                        }
+                      />
+                      <Toggle
+                        label="Шумоподавление"
+                        desc="Гасит фоновые шумы: клавиатуру, кулеры, эхо комнаты."
+                        checked={prefs.audioConstraints.noiseSuppression}
+                        onChange={(v) =>
+                          update({
+                            audioConstraints: { ...prefs.audioConstraints, noiseSuppression: v },
+                          })
+                        }
+                      />
+                      <Toggle
+                        label="Авто-громкость"
+                        desc="Подстраивает уровень микрофона автоматически."
+                        checked={prefs.audioConstraints.autoGainControl}
+                        onChange={(v) =>
+                          update({
+                            audioConstraints: { ...prefs.audioConstraints, autoGainControl: v },
+                          })
+                        }
+                      />
+                    </>
+                  )}
+  
+                  {activeTab === 'system' && (
+                    <>
+                      {/* Sounds toggle + volume sub-control share one row container —
+                          the volume slider is conceptually a sub-setting of the toggle,
+                          so no internal hairline separates them. */}
+                      <div className="border-b border-white/[0.05] py-4 last:border-b-0">
+                        <label className="flex cursor-pointer select-none items-center justify-between gap-6">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className="text-[13px] font-medium text-fg">Системные звуки</span>
+                            <span className="text-[12px] leading-[1.5] text-fg-subtle">
+                              Подключение/отключение участников, входящие сообщения.
+                            </span>
+                          </div>
+                          <Switch
+                            checked={prefs.soundsEnabled}
+                            onCheckedChange={(v) => update({ soundsEnabled: v })}
+                          />
+                        </label>
+                        <div
+                          className={cn(
+                            'mt-3 flex items-center gap-4 pl-3 transition-opacity',
+                            !prefs.soundsEnabled && 'opacity-40',
+                          )}
                         >
-                          <Keyboard />
-                          {capturing ? 'Нажмите клавишу…' : prefs.pushToTalk.key}
-                        </Button>
-                      </div>
-                    )}
-                    {prefs.micActivationMode === 'vad' && (
-                      <VadSection prefs={prefs} update={update} />
-                    )}
-                  </>
-                )}
-
-                {activeTab === 'hotkeys' && (
-                  <>
-                    <HotkeyField
-                      label="Выключить / включить микрофон"
-                      value={prefs.globalShortcutToggleMute}
-                      onChange={(v) => update({ globalShortcutToggleMute: v })}
-                    />
-                    <HotkeyField
-                      label="Покинуть комнату"
-                      value={prefs.globalShortcutLeaveRoom}
-                      onChange={(v) => update({ globalShortcutLeaveRoom: v })}
-                    />
-                    <p className="text-[11px] leading-relaxed text-fg-subtle">
-                      Минимум один
-                      модификатор (Ctrl / Alt / Shift) обязателен. Escape во
-                      время захвата — очистить.
-                    </p>
-                  </>
-                )}
-
-                {activeTab === 'audio' && (
-                  <>
-                    <Toggle
-                      label="Эхоподавление"
-                      desc="Убирает эхо, когда звук идёт через колонки."
-                      checked={prefs.audioConstraints.echoCancellation}
-                      onChange={(v) =>
-                        update({
-                          audioConstraints: { ...prefs.audioConstraints, echoCancellation: v },
-                        })
-                      }
-                    />
-                    <Toggle
-                      label="Шумоподавление"
-                      desc="Гасит фоновые шумы: клавиатуру, кулеры, эхо комнаты."
-                      checked={prefs.audioConstraints.noiseSuppression}
-                      onChange={(v) =>
-                        update({
-                          audioConstraints: { ...prefs.audioConstraints, noiseSuppression: v },
-                        })
-                      }
-                    />
-                    <Toggle
-                      label="Авто-громкость"
-                      desc="Подстраивает уровень микрофона автоматически."
-                      checked={prefs.audioConstraints.autoGainControl}
-                      onChange={(v) =>
-                        update({
-                          audioConstraints: { ...prefs.audioConstraints, autoGainControl: v },
-                        })
-                      }
-                    />
-                  </>
-                )}
-
-                {activeTab === 'system' && (
-                  <>
-                    {/* Sounds toggle + volume sub-control share one row container —
-                        the volume slider is conceptually a sub-setting of the toggle,
-                        so no internal hairline separates them. */}
-                    <div className="border-b border-white/[0.05] py-4 last:border-b-0">
-                      <label className="flex cursor-pointer select-none items-center justify-between gap-6">
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <span className="text-[13px] font-medium text-fg">Системные звуки</span>
-                          <span className="text-[12px] leading-[1.5] text-fg-subtle">
-                            Подключение/отключение участников, входящие сообщения.
+                          <span className="shrink-0 text-[12px] text-fg-muted">Громкость</span>
+                          <div className="min-w-0 flex-1">
+                            <Slider
+                              min={0}
+                              max={100}
+                              step={5}
+                              value={[Math.round(prefs.soundsVolume * 100)]}
+                              onValueChange={(v) =>
+                                void update({ soundsVolume: (v[0] ?? 40) / 100 })
+                              }
+                              disabled={!prefs.soundsEnabled}
+                            />
+                          </div>
+                          <span className="w-10 shrink-0 text-right font-mono text-[10px] tabular-nums text-fg-subtle">
+                            {Math.round(prefs.soundsVolume * 100)}%
                           </span>
                         </div>
-                        <Switch
-                          checked={prefs.soundsEnabled}
-                          onCheckedChange={(v) => update({ soundsEnabled: v })}
-                        />
-                      </label>
-                      <div
-                        className={cn(
-                          'mt-3 flex items-center gap-4 pl-3 transition-opacity',
-                          !prefs.soundsEnabled && 'opacity-40',
-                        )}
-                      >
-                        <span className="shrink-0 text-[12px] text-fg-muted">Громкость</span>
-                        <div className="min-w-0 flex-1">
-                          <Slider
-                            min={0}
-                            max={100}
-                            step={5}
-                            value={[Math.round(prefs.soundsVolume * 100)]}
-                            onValueChange={(v) =>
-                              void update({ soundsVolume: (v[0] ?? 40) / 100 })
-                            }
-                            disabled={!prefs.soundsEnabled}
+                      </div>
+  
+                      {/* Notifications toggle + position picker share one row container —
+                          picker is conceptually a sub-setting of the toggle. */}
+                      <div className="border-b border-white/[0.05] py-4 last:border-b-0">
+                        <label className="flex cursor-pointer select-none items-center justify-between gap-6">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className="text-[13px] font-medium text-fg">
+                              Уведомления о сообщениях в фоне
+                            </span>
+                            <span className="text-[12px] leading-[1.5] text-fg-subtle">
+                              Показывать всплывающий тост, когда окно вне фокуса.
+                            </span>
+                          </div>
+                          <Switch
+                            checked={prefs.notificationsEnabled}
+                            onCheckedChange={(v) => update({ notificationsEnabled: v })}
+                          />
+                        </label>
+                        <div
+                          className={cn(
+                            'mt-3 flex flex-col gap-2 pl-3 transition-opacity',
+                            !prefs.notificationsEnabled && 'opacity-40',
+                          )}
+                        >
+                          <span className="text-[12px] text-fg-muted">Позиция на экране</span>
+                          <NotificationCornerPicker
+                            value={prefs.notificationPosition}
+                            onChange={(v) => update({ notificationPosition: v })}
+                            disabled={!prefs.notificationsEnabled}
                           />
                         </div>
-                        <span className="w-10 shrink-0 text-right font-mono text-[10px] tabular-nums text-fg-subtle">
-                          {Math.round(prefs.soundsVolume * 100)}%
-                        </span>
                       </div>
-                    </div>
-
-                    {/* Notifications toggle + position picker share one row container —
-                        picker is conceptually a sub-setting of the toggle. */}
-                    <div className="border-b border-white/[0.05] py-4 last:border-b-0">
-                      <label className="flex cursor-pointer select-none items-center justify-between gap-6">
+  
+                      <Toggle
+                        label="Сворачивать в трей при закрытии"
+                        desc="Кнопка закрытия не выключает приложение, а отправляет его в трей."
+                        checked={prefs.closeToTray}
+                        onChange={(v) => update({ closeToTray: v })}
+                      />
+                    </>
+                  )}
+  
+                  {activeTab === 'screen' && (
+                    <>
+                      <Block
+                        title="Профиль качества"
+                        desc="Выбери баланс между плавностью и чёткостью."
+                      >
+                        <ScreenSharePresetPicker
+                          value={prefs.screenSharePreset}
+                          onChange={(v) => update({ screenSharePreset: v })}
+                        />
+                      </Block>
+                      {/* Codec — inline mset-row (label left, select right). */}
+                      <div className="flex items-center justify-between gap-6 border-b border-white/[0.05] py-4 last:border-b-0">
                         <div className="flex min-w-0 flex-col gap-1">
-                          <span className="text-[13px] font-medium text-fg">
-                            Уведомления о сообщениях в фоне
-                          </span>
+                          <span className="text-[13px] font-medium text-fg">Видеокодек</span>
                           <span className="text-[12px] leading-[1.5] text-fg-subtle">
-                            Показывать всплывающий тост, когда окно вне фокуса.
+                            VP8 быстрее на CPU, H264 даёт лучшее качество.
                           </span>
                         </div>
-                        <Switch
-                          checked={prefs.notificationsEnabled}
-                          onCheckedChange={(v) => update({ notificationsEnabled: v })}
-                        />
-                      </label>
-                      <div
-                        className={cn(
-                          'mt-3 flex flex-col gap-2 pl-3 transition-opacity',
-                          !prefs.notificationsEnabled && 'opacity-40',
-                        )}
-                      >
-                        <span className="text-[12px] text-fg-muted">Позиция на экране</span>
-                        <NotificationCornerPicker
-                          value={prefs.notificationPosition}
-                          onChange={(v) => update({ notificationPosition: v })}
-                          disabled={!prefs.notificationsEnabled}
+                        <ScreenShareCodecPicker
+                          value={prefs.screenShareCodec}
+                          onChange={(v) => update({ screenShareCodec: v })}
                         />
                       </div>
-                    </div>
-
-                    <Toggle
-                      label="Сворачивать в трей при закрытии"
-                      desc="Кнопка закрытия не выключает приложение, а отправляет его в трей."
-                      checked={prefs.closeToTray}
-                      onChange={(v) => update({ closeToTray: v })}
-                    />
-                  </>
-                )}
-
-                {activeTab === 'screen' && (
-                  <>
-                    <Block
-                      title="Профиль качества"
-                      desc="Выбери баланс между плавностью и чёткостью."
-                    >
-                      <ScreenSharePresetPicker
-                        value={prefs.screenSharePreset}
-                        onChange={(v) => update({ screenSharePreset: v })}
-                      />
-                    </Block>
-                    {/* Codec — inline mset-row (label left, select right). */}
-                    <div className="flex items-center justify-between gap-6 border-b border-white/[0.05] py-4 last:border-b-0">
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <span className="text-[13px] font-medium text-fg">Видеокодек</span>
-                        <span className="text-[12px] leading-[1.5] text-fg-subtle">
-                          VP8 быстрее на CPU, H264 даёт лучшее качество.
-                        </span>
-                      </div>
-                      <ScreenShareCodecPicker
-                        value={prefs.screenShareCodec}
-                        onChange={(v) => update({ screenShareCodec: v })}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
+                    </>
+                  )}
+                </div>
+              </ErrorBoundary>
             </div>
           </main>
         </div>
@@ -495,6 +505,21 @@ function AppFooter() {
       >
         {isBusy ? <Loader2 className="animate-spin" /> : <RefreshCw />}
         <span>Проверить обновления</span>
+      </Button>
+    </div>
+  );
+}
+
+function TabCrashFallback({ error, onRetry }: { error: Error; onRetry: () => void }) {
+  return (
+    <div className="mt-6 flex flex-col items-start gap-3 rounded-md border border-rose-400/20 bg-rose-400/[0.04] p-4">
+      <span className="text-[13px] font-medium text-fg">Не удалось отобразить раздел</span>
+      <span className="break-all font-mono text-[11px] leading-relaxed text-fg-subtle">
+        {error.message || String(error)}
+      </span>
+      <Button variant="outline" size="sm" onClick={onRetry} className="text-xs">
+        <RefreshCw />
+        Повторить
       </Button>
     </div>
   );

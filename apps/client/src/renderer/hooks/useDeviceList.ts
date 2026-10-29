@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react';
+import { groupDevices, type DeviceList } from '../lib/devices.js';
 
-export type DeviceList = {
-  audioInputs: MediaDeviceInfo[];
-  audioOutputs: MediaDeviceInfo[];
-  videoInputs: MediaDeviceInfo[];
-};
+export type { DeviceList };
 
 export function useDeviceList(): DeviceList {
   const [list, setList] = useState<DeviceList>({ audioInputs: [], audioOutputs: [], videoInputs: [] });
@@ -15,11 +12,7 @@ export function useDeviceList(): DeviceList {
     const enumerate = async () => {
       const devices = await navigator.mediaDevices.enumerateDevices();
       if (cancelled) return;
-      setList({
-        audioInputs: devices.filter((d) => d.kind === 'audioinput'),
-        audioOutputs: devices.filter((d) => d.kind === 'audiooutput'),
-        videoInputs: devices.filter((d) => d.kind === 'videoinput'),
-      });
+      setList(groupDevices(devices));
     };
 
     // First call: prime the permission once so device labels populate.
@@ -34,7 +27,7 @@ export function useDeviceList(): DeviceList {
       await enumerate();
     };
 
-    init();
+    init().catch(() => undefined);
     const onChange = () => enumerate().catch(() => undefined);
     navigator.mediaDevices.addEventListener('devicechange', onChange);
     return () => {
