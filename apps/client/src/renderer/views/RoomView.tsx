@@ -10,7 +10,6 @@ import { useMicActivationModeSync } from '../hooks/useMicActivationModeSync.js';
 import { useConnectionQuality, qualityLabel } from '../hooks/useConnectionQuality.js';
 import { ParticipantTile } from '../components/ParticipantTile.js';
 import { ControlBar } from '../components/ControlBar.js';
-import { ScreenSourcePicker } from '../components/ScreenSourcePicker.js';
 import { ChatPanel } from '../components/ChatPanel.js';
 import { ToastTray } from '../components/Toast.js';
 import { SettingsModal } from '../components/SettingsModal.js';
@@ -20,7 +19,7 @@ import { ChevronLeft } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { onLeaveRoom } from '../lib/app-actions.js';
 import { cn } from '../lib/cn.js';
-import type { ScreenSource, ScreenSharePreset } from '../../shared/types.js';
+import type { ScreenSharePreset } from '../../shared/types.js';
 
 type ScreenShareProfile = {
   width: number;
@@ -44,14 +43,6 @@ export function RoomView() {
   const { qualities, rttMs } = useConnectionQuality(room);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [screenShareParticipant, setScreenShareParticipant] = useState<Participant | null>(null);
-  // Picker управляется промисом — startShare сам зовёт getScreenSources,
-  // показывает диалог и ждёт выбор. setDisplayMediaRequestHandler не
-  // используется: в Electron он жёстко зашивает capture pipeline на legacy
-  // GDI с cap ~17 fps и обойти это нельзя ни флагами, ни constraints.
-  const [pickerPromise, setPickerPromise] = useState<{
-    sources: ScreenSource[];
-    resolve: (chosen: ScreenSource | null) => void;
-  } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Цикл мониторинга здоровья скриншер-капчи. Живёт ровно сколько идёт
   // публикация, чтобы не дёргать getStats() впустую вне сессии шеры.
@@ -71,7 +62,7 @@ export function RoomView() {
 
   // Когда любой тайл уходит в fullscreen, надо скрыть остальной chrome
   // (TitleBar, ChatPanel, ControlBar). Браузерный Fullscreen API в теории
-  // делает это сам через top-layer, но на практике в Electron/Tauri WebView2
+  // делает это сам через top-layer, но на практике в Tauri WebView2
   // chrome всё равно "просвечивает" внизу экрана (пользовательский report).
   // Поэтому делаем явный hidden через React state.
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -138,72 +129,29 @@ export function RoomView() {
     const profile = SCREEN_SHARE_PROFILES[prefs?.screenSharePreset ?? 'smooth'];
 
     try {
-      // Сначала пытаемся через Electron-специфичный путь: getScreenSources
-      // возвращает desktop sources с ID вида "screen:0:0" / "window:HWND:0",
-      // дальше getUserMedia с mandatory.chromeMediaSourceId создаёт capture
-      // session напрямую — не через setDisplayMediaRequestHandler — и
-      // Chromium здесь корректно выбирает WGC capturer с заявленным
-      // frameRate. На Tauri/WebView2 getScreenSources вернёт пустой массив,
-      // тогда падаем в стандартный getDisplayMedia с системным picker.
-      let track: MediaStreamTrack | undefined;
-      // Аудио-track системного звука (только Tauri/WebView2 путь, см. ниже).
-      // В Electron путь захватывает только видео — chromeMediaSource audio
-      // нестабилен на Windows и часто требует stereo-mix, не включён по дефолту.
-      let audioTrack: MediaStreamTrack | undefined;
-      const sources = await window.api.getScreenSources();
-      if (sources.length > 0) {
-        const chosen = await new Promise<ScreenSource | null>((resolve) => {
-          setPickerPromise({ sources, resolve });
-        });
-        if (!chosen) return;
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          // Старый Electron API (chromeMediaSource). Type-cast: WebRTC-types
-          // не описывают `mandatory`, но в Chromium-Electron он работает.
-          // Без minFrameRate capturer вообще не запускается ("Timeout starting
-          // video source") — Chromium считает constraint недостижимым.
-          video: {
-            mandatory: {
-              chromeMediaSource: 'desktop',
-              chromeMediaSourceId: chosen.id,
-              minFrameRate: profile.fps,
-              maxFrameRate: profile.fps,
-            },
-          } as unknown as MediaTrackConstraints,
-        });
-        track = stream.getVideoTracks()[0];
-        // Один раз логируем что реально согласовалось — нужно для диагностики
-        // потолка captureFps. capabilities.frameRate.max = верхняя граница
-        // самого capturer'а, settings.frameRate = что согласовано в этой сессии.
-        // Если capabilities.max < 60 — capturer структурно не умеет 60 fps
-        // на этом источнике и его меняет только переход на другой backend.
-        console.log('[screen-share] settings', track.getSettings());
-        console.log('[screen-share] capabilities', track.getCapabilities?.());
-      } else {
-        // Tauri / WebView2: системный picker. ВАЖНО — `video: true` без
-        // frameRate в исходных constraints; иначе WebView2 выбирает
-        // менее производительный capture backend (у юзера это уронило
-        // screen-share с ~45 до ~30 fps). frameRate выставляем поздним
-        // applyConstraints — для этого пути это работает.
-        //
-        // `audio: true` — WebView2 покажет в picker'е чекбокс "Поделиться
-        // системным звуком". Если юзер отметит → stream.getAudioTracks()
-        // вернёт system-audio loopback (то, что играет в динамики). Если
-        // не отметит — массив пустой, видео всё равно публикуется.
-        const stream = await navigator.mediaDevices.getDisplayMedia({
-          audio: true,
-          video: true,
-        });
-        track = stream.getVideoTracks()[0];
-        audioTrack = stream.getAudioTracks()[0];
-        if (track) {
-          try {
-            await track.applyConstraints({
-              frameRate: { ideal: profile.fps, max: profile.fps },
-            });
-          } catch (e) {
-            console.warn('[screen-share] frameRate applyConstraints failed', e);
-          }
+      // Системный picker (WebView2 / браузер). ВАЖНО — `video: true` без
+      // frameRate в исходных constraints; иначе WebView2 выбирает
+      // менее производительный capture backend (у юзера это уронило
+      // screen-share с ~45 до ~30 fps). frameRate выставляем поздним
+      // applyConstraints — для этого пути это работает.
+      //
+      // `audio: true` — WebView2 покажет в picker'е чекбокс "Поделиться
+      // системным звуком". Если юзер отметит → stream.getAudioTracks()
+      // вернёт system-audio loopback (то, что играет в динамики). Если
+      // не отметит — массив пустой, видео всё равно публикуется.
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        audio: true,
+        video: true,
+      });
+      const track = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0];
+      if (track) {
+        try {
+          await track.applyConstraints({
+            frameRate: { ideal: profile.fps, max: profile.fps },
+          });
+        } catch (e) {
+          console.warn('[screen-share] frameRate applyConstraints failed', e);
         }
       }
       if (!track) throw new Error('no video track');
@@ -216,7 +164,7 @@ export function RoomView() {
       const captureHeight = settings.height ?? profile.height;
       const scaleResolutionDownBy = Math.max(1, captureHeight / profile.height);
 
-      // Кодек: H264 в Electron-Chromium для WebRTC обычно идёт через софтовый
+      // Кодек: H264 в Chromium (WebView2) для WebRTC обычно идёт через софтовый
       // OpenH264 — он не вытягивает 1080p60. VP8 (libvpx) в софте быстрее
       // OpenH264 на 30-50% при той же картинке. Берём выбор пользователя из prefs.
       const publication = await room.localParticipant.publishTrack(track, {
@@ -329,15 +277,6 @@ export function RoomView() {
     const localSharing = !!room?.localParticipant.getTrackPublication(Track.Source.ScreenShare);
     if (localSharing) stopShare();
     else startShare();
-  };
-
-  const onPickerPick = (source: ScreenSource) => {
-    pickerPromise?.resolve(source);
-    setPickerPromise(null);
-  };
-  const onPickerCancel = () => {
-    pickerPromise?.resolve(null);
-    setPickerPromise(null);
   };
 
   return (
@@ -462,14 +401,6 @@ export function RoomView() {
           />
         )}
       </main>
-
-      {pickerPromise && (
-        <ScreenSourcePicker
-          sources={pickerPromise.sources}
-          onPick={onPickerPick}
-          onCancel={onPickerCancel}
-        />
-      )}
 
       <ToastTray />
 

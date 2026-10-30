@@ -13,17 +13,10 @@ export function App() {
   }, [setPrefs]);
 
   // Применяем глобальные хоткеи на старте и при каждом изменении префов.
-  // setGlobalShortcuts отсутствует в Electron-preload — optional chain
-  // молча скипает (в Electron этой фичи нет, плагин Tauri-only).
+  // В браузере глобальных хоткеев нет — optional chain молча скипает.
   useEffect(() => {
     if (!prefs) return;
-    const api = window.api as {
-      setGlobalShortcuts?: (opts: {
-        globalShortcutToggleMute: string;
-        globalShortcutLeaveRoom: string;
-      }) => Promise<void>;
-    };
-    void api.setGlobalShortcuts?.({
+    void window.api.setGlobalShortcuts?.({
       globalShortcutToggleMute: prefs.globalShortcutToggleMute,
       globalShortcutLeaveRoom: prefs.globalShortcutLeaveRoom,
     });
@@ -36,11 +29,7 @@ export function App() {
   const activeRoom = useStore((s) => s.activeRoom);
   const micMutedByUser = useStore((s) => s.micMutedByUser);
   useEffect(() => {
-    const api = window.api as {
-      setTrayMicMuted?: (muted: boolean) => Promise<void>;
-      setTaskbarOverlayMuted?: (muted: boolean) => Promise<void>;
-      syncTrayMenu?: (state: { inRoom: boolean; muted: boolean }) => Promise<void>;
-    };
+    const api = window.api;
     const inRoom = activeRoom !== null;
     const showMuted = inRoom && micMutedByUser;
     void api.setTrayMicMuted?.(showMuted);

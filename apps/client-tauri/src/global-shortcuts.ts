@@ -8,7 +8,7 @@
 //
 // Лежит в apps/client-tauri/src/, а не в общем renderer'е: импортит
 // @tauri-apps/plugin-global-shortcut, который установлен только в Tauri-
-// пакете. Renderer (Electron+Tauri-shared) дёргает фичу через
+// пакете. Общий renderer (Tauri + web) дёргает фичу через
 // window.api.setGlobalShortcuts() — preload-shim проксирует сюда.
 
 import { register, unregister } from '@tauri-apps/plugin-global-shortcut';

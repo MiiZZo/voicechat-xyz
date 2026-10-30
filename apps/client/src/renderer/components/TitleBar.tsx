@@ -17,18 +17,21 @@ export const titleBarNoDrag = noDragStyle;
 
 export function TitleBar({ children, className }: Props) {
   const [maximized, setMaximized] = useState(false);
+  // В браузере окном управляет сам браузер: ни кнопок, ни drag-региона.
+  const win = window.api.window;
 
   useEffect(() => {
+    if (!win) return;
     let cancelled = false;
-    window.api.window.isMaximized().then((m) => {
+    win.isMaximized().then((m) => {
       if (!cancelled) setMaximized(m);
     });
-    const off = window.api.window.onMaximizedChange(setMaximized);
+    const off = win.onMaximizedChange(setMaximized);
     return () => {
       cancelled = true;
       off();
     };
-  }, []);
+  }, [win]);
 
   return (
     <header
@@ -43,7 +46,7 @@ export function TitleBar({ children, className }: Props) {
         "after:pointer-events-none after:absolute after:bottom-0 after:left-6 after:right-6 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/5 after:to-transparent after:content-['']",
         className,
       )}
-      style={dragStyle}
+      style={win ? dragStyle : undefined}
     >
       <div className="flex min-w-0 flex-1 items-center gap-3 px-3">{children}</div>
 
@@ -59,31 +62,33 @@ export function TitleBar({ children, className }: Props) {
         </div>
       )}
 
-      <div className="flex items-stretch" style={noDragStyle}>
-        <CtrlButton
-          label="Свернуть"
-          onClick={() => window.api.window.minimize()}
-        >
-          <Minus className="h-3.5 w-3.5" strokeWidth={1.5} />
-        </CtrlButton>
-        <CtrlButton
-          label={maximized ? 'Свернуть в окно' : 'Развернуть'}
-          onClick={() => window.api.window.toggleMaximize()}
-        >
-          {maximized ? (
-            <Copy className="h-3 w-3" strokeWidth={1.5} />
-          ) : (
-            <Square className="h-3 w-3" strokeWidth={1.5} />
-          )}
-        </CtrlButton>
-        <CtrlButton
-          label="Закрыть"
-          onClick={() => window.api.window.close()}
-          danger
-        >
-          <X className="h-3.5 w-3.5" strokeWidth={1.5} />
-        </CtrlButton>
-      </div>
+      {win && (
+        <div className="flex items-stretch" style={noDragStyle}>
+          <CtrlButton
+            label="Свернуть"
+            onClick={() => win.minimize()}
+          >
+            <Minus className="h-3.5 w-3.5" strokeWidth={1.5} />
+          </CtrlButton>
+          <CtrlButton
+            label={maximized ? 'Свернуть в окно' : 'Развернуть'}
+            onClick={() => win.toggleMaximize()}
+          >
+            {maximized ? (
+              <Copy className="h-3 w-3" strokeWidth={1.5} />
+            ) : (
+              <Square className="h-3 w-3" strokeWidth={1.5} />
+            )}
+          </CtrlButton>
+          <CtrlButton
+            label="Закрыть"
+            onClick={() => win.close()}
+            danger
+          >
+            <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+          </CtrlButton>
+        </div>
+      )}
     </header>
   );
 }

@@ -7,7 +7,7 @@
 - Установлены Docker и Docker Compose plugin (`wget -qO- https://get.docker.com | sh`)
 - Доменное имя с DNS-зоной в Cloudflare (free plan ок) и двумя A-записями
   на IP сервера, **облачко серое (DNS only)** для обоих:
-  - `chat.example.com` → лобби
+  - `chat.example.com` → лобби + веб-клиент
   - `livekit.example.com` → SFU
 - Cloudflare API token с правом `Zone:DNS:Edit` для зоны домена
   (https://dash.cloudflare.com/profile/api-tokens, шаблон **Edit zone DNS**).
@@ -26,6 +26,10 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
+Образ Caddy заодно собирает веб-клиент (`apps/client`) и раздаёт его с
+`LOBBY_DOMAIN`: `/api/*` и `/healthz` проксируются в lobby, остальное — SPA.
+После изменений в клиенте достаточно `docker compose up -d --build caddy`.
+
 Первая сборка собирает Caddy с плагином `caddy-dns/cloudflare` через xcaddy
 (~3-7 минут на 1 vCPU; для VPS с <2 ГБ RAM желательно 2 ГБ swap, иначе
 сборщик может OOM-killнуться). После старта Caddy получает сертификаты
@@ -37,6 +41,8 @@ curl https://chat.example.com/healthz
 # → {"status":"ok"}
 curl https://chat.example.com/api/rooms
 # → [{"id":"general", ...}]
+curl -I https://chat.example.com/
+# → 200, веб-клиент
 ```
 
 ## Изменение списка комнат

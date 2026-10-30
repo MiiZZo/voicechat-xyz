@@ -401,7 +401,7 @@ export function ParticipantTile({ p, big = false, fill = false, videoSource = Tr
     }
   }, [p, screenMuted, persistedScreenVolume, screenAudioGraphTick]);
 
-  // AudioContexts may start suspended in Electron until first user gesture.
+  // AudioContexts may start suspended until the first user gesture.
   // Resume both mic and screen-share contexts on the next pointer/key event.
   useEffect(() => {
     const micCtx = audioCtxRef.current;

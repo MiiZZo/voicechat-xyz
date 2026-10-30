@@ -23,8 +23,8 @@ export type ScreenSharePreset = 'smooth' | 'sharp' | 'max';
 
 /**
  * Кодек для screen-share в WebRTC.
- *  - 'h264' — Electron-Chromium почти всегда даёт софт OpenH264 (медленный),
- *    HW-MediaFoundation в стандартной Electron-сборке часто недоступен.
+ *  - 'h264' — в WebView2/Chromium часто софтовый OpenH264 (медленный),
+ *    HW-MediaFoundation доступен не всегда.
  *  - 'vp8'  — libvpx, в софте обычно быстрее OpenH264. Безопасный дефолт.
  *  - 'vp9'  — лучше сжатие, но в софте дороже; HW-VP9 редко.
  *  - 'av1'  — HW только на RTX 40 / Arc / Ryzen 7000+. В софте неподъёмен.
@@ -79,12 +79,6 @@ export type Prefs = {
 /** Какой угол primary monitor'а используется для notification-окна. */
 export type NotificationCorner = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
-export type ScreenSource = {
-  id: string;
-  name: string;
-  thumbnailDataUrl: string;
-};
-
 export type UpdateStatus =
   | { kind: 'idle' }
   | { kind: 'checking' }
@@ -92,33 +86,6 @@ export type UpdateStatus =
   | { kind: 'downloading'; percent: number }
   | { kind: 'ready'; version: string }
   | { kind: 'error'; message: string };
-
-export const IPC = {
-  GetPrefs: 'prefs:get',
-  SetPrefs: 'prefs:set',
-  GetScreenSources: 'screen:get-sources',
-  CheckUpdate: 'update:check',
-  InstallUpdate: 'update:install',
-  UpdateStatus: 'update:status',
-  WindowMinimize: 'window:minimize',
-  WindowMaximizeToggle: 'window:maximize-toggle',
-  WindowClose: 'window:close',
-  WindowIsMaximized: 'window:is-maximized',
-  WindowMaximizedChanged: 'window:maximized-changed',
-  FileDownload: 'file:download',
-  ScreenShareRequest: 'screen-share:request',
-  ScreenShareResponse: 'screen-share:response',
-  OpenInternalUrl: 'debug:open-internal-url',
-} as const;
-
-export type ScreenShareRequestPayload = {
-  requestId: string;
-  sources: ScreenSource[];
-};
-export type ScreenShareResponsePayload = {
-  requestId: string;
-  sourceId: string | null;
-};
 
 export type FileDownloadRequest = {
   url: string;

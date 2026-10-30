@@ -77,9 +77,15 @@ const TABS: TabDef[] = [
 
 export function SettingsModal({ open, onOpenChange }: Props) {
   const { prefs, setPrefs } = useStore();
-  const devices = useDeviceList();
+  // Только пока модалка открыта: модалка смонтирована всегда (в лобби и в
+  // комнате), а priming-getUserMedia в браузере — это запрос доступа к камере.
+  const devices = useDeviceList(open);
   const [capturing, setCapturing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('devices');
+  // Глобальных хоткеев и трея в браузере нет — прячем их настройки.
+  const hasGlobalShortcuts = !!window.api.setGlobalShortcuts;
+  const hasWindow = !!window.api.window;
+  const tabs = TABS.filter((t) => t.id !== 'hotkeys' || hasGlobalShortcuts);
 
   if (!prefs) return null;
 
@@ -109,7 +115,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
     });
   };
 
-  const current = TABS.find((t) => t.id === activeTab) ?? TABS[0]!;
+  const current = tabs.find((t) => t.id === activeTab) ?? tabs[0]!;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -155,7 +161,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
           {/* Sidebar — section nav only (title moved to modal header above). */}
           <aside className="flex w-[200px] shrink-0 flex-col border-r border-white/[0.05] bg-black/20 pt-3.5">
             <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 pb-3">
-              {TABS.map((tab) => (
+              {tabs.map((tab) => (
                 <TabButton
                   key={tab.id}
                   tab={tab}
@@ -207,7 +213,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                       />
                     </>
                   )}
-  
+
                   {activeTab === 'mic' && (
                     <>
                       <Block
@@ -230,12 +236,18 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                           </Button>
                         </div>
                       )}
+                      {prefs.micActivationMode === 'ptt' && !hasGlobalShortcuts && (
+                        <p className="pt-3 text-[11px] leading-relaxed text-fg-subtle">
+                          В браузере клавиша срабатывает, только пока вкладка
+                          активна.
+                        </p>
+                      )}
                       {prefs.micActivationMode === 'vad' && (
                         <VadSection prefs={prefs} update={update} />
                       )}
                     </>
                   )}
-  
+
                   {activeTab === 'hotkeys' && (
                     <>
                       <HotkeyField
@@ -255,7 +267,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                       </p>
                     </>
                   )}
-  
+
                   {activeTab === 'audio' && (
                     <>
                       <Toggle
@@ -290,7 +302,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                       />
                     </>
                   )}
-  
+
                   {activeTab === 'system' && (
                     <>
                       {/* Sounds toggle + volume sub-control share one row container —
@@ -333,7 +345,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                           </span>
                         </div>
                       </div>
-  
+
                       {/* Notifications toggle + position picker share one row container —
                           picker is conceptually a sub-setting of the toggle. */}
                       <div className="border-b border-white/[0.05] py-4 last:border-b-0">
@@ -365,16 +377,18 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                           />
                         </div>
                       </div>
-  
-                      <Toggle
-                        label="Сворачивать в трей при закрытии"
-                        desc="Кнопка закрытия не выключает приложение, а отправляет его в трей."
-                        checked={prefs.closeToTray}
-                        onChange={(v) => update({ closeToTray: v })}
-                      />
+
+                      {hasWindow && (
+                        <Toggle
+                          label="Сворачивать в трей при закрытии"
+                          desc="Кнопка закрытия не выключает приложение, а отправляет его в трей."
+                          checked={prefs.closeToTray}
+                          onChange={(v) => update({ closeToTray: v })}
+                        />
+                      )}
                     </>
                   )}
-  
+
                   {activeTab === 'screen' && (
                     <>
                       <Block
@@ -452,10 +466,11 @@ function AppFooter() {
   const [recentCheckAt, setRecentCheckAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
+  const canUpdate = !!window.api.checkUpdate;
+
   useEffect(() => {
-    const api = window.api as { getAppVersion?: () => Promise<string> };
-    void api.getAppVersion?.().then(setVersion).catch(() => {});
-    return window.api.onUpdateStatus(setStatus);
+    void window.api.getAppVersion().then(setVersion).catch(() => {});
+    return window.api.onUpdateStatus?.(setStatus);
   }, []);
 
   // Тикаем каждую секунду пока активна "транзитная" подпись — иначе текст
@@ -474,7 +489,7 @@ function AppFooter() {
   const onCheck = () => {
     setRecentCheckAt(Date.now());
     setNow(Date.now());
-    void window.api.checkUpdate();
+    void window.api.checkUpdate?.();
   };
 
   let statusText: string | null = null;
@@ -496,16 +511,19 @@ function AppFooter() {
           <span className="truncate text-[10px] text-fg-subtle">{statusText}</span>
         )}
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onCheck}
-        disabled={isBusy}
-        className="h-7 w-full gap-1.5 text-xs"
-      >
-        {isBusy ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-        <span>Проверить обновления</span>
-      </Button>
+      {/* В браузере обновление — это просто новая версия сайта. */}
+      {canUpdate && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onCheck}
+          disabled={isBusy}
+          className="h-7 w-full gap-1.5 text-xs"
+        >
+          {isBusy ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+          <span>Проверить обновления</span>
+        </Button>
+      )}
     </div>
   );
 }
@@ -546,8 +564,7 @@ function ContentHeader({ tab }: { tab: TabDef }) {
 function HeaderVersionBadge() {
   const [version, setVersion] = useState<string | null>(null);
   useEffect(() => {
-    const api = window.api as { getAppVersion?: () => Promise<string> };
-    void api.getAppVersion?.().then(setVersion).catch(() => undefined);
+    void window.api.getAppVersion().then(setVersion).catch(() => undefined);
   }, []);
   if (!version) return null;
   return (

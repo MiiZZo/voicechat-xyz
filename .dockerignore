@@ -1,0 +1,7 @@
+# Build context для lobby и caddy — корень репо. Без этого в daemon улетают
+# node_modules и Rust target (гигабайты).
+.git
+**/node_modules
+**/dist
+apps/client-tauri/src-tauri/target
+apps/server/uploads

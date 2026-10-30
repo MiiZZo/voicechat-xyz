@@ -1,8 +1,8 @@
 # @voicechat/client-tauri
 
-Второй desktop-клиент VoiceChat — на Tauri 2 (Rust + WebView2 на Windows /
-WKWebView на macOS / WebKitGTK на Linux). Соседствует с Electron-клиентом,
-переиспользует **тот же** React UI без копирования.
+Desktop-клиент VoiceChat — на Tauri 2 (Rust + WebView2 на Windows /
+WKWebView на macOS / WebKitGTK на Linux). Переиспользует **тот же** React UI,
+что и веб-клиент (`apps/client`), без копирования.
 
 ## Как переиспользуется UI
 
@@ -11,14 +11,13 @@ WKWebView на macOS / WebKitGTK на Linux). Соседствует с Electron
 
 ```
 apps/client/src/renderer/   ← один источник истины
-apps/client/src/shared/     ← общий контракт типов
+apps/client/src/shared/     ← общие типы и контракт window.api (api.ts)
 ```
 
-`apps/client-tauri/index.html` грузит `../client/src/renderer/main.tsx` и
-предварительно ставит `window.api` через `src/preload-shim.ts`, который
-маппит контракт Electron-preload'а на Tauri commands/events. Никаких правок в
-Electron-клиенте при этом не требуется — рендерер видит идентичный
-`window.api` объект и не знает, в каком хосте он запущен.
+`src/entry.ts` сначала ставит `window.api` через `src/preload-shim.ts`
+(реализация контракта `shared/api.ts` поверх Tauri commands/events), затем
+грузит renderer. Веб-клиент делает то же своей реализацией в
+`apps/client/src/web/api.ts`; desktop-only методы в контракте необязательны.
 
 ## Запуск
 
@@ -33,37 +32,28 @@ npm run dev:client-tauri    # терминал 2 — Tauri dev
 
 Tauri dev сначала запускает `vite --mode local-server` на `127.0.0.1:5174`,
 затем поднимает Rust-процесс с devUrl=этому порту. Использует те же
-`apps/client/.env.local-server` / `.env.remote-server`, что и Electron-клиент,
+`apps/client/.env.local-server` / `.env.remote-server`, что и веб-клиент,
 для `VITE_LOBBY_URL`.
 
-## Что зеркально перенесено из Electron-клиента
+## Подсистемы
 
-| Подсистема | Tauri-эквивалент |
+| Подсистема | Реализация |
 |---|---|
-| `electron-store` prefs + миграция | `tauri-plugin-store` + `prefs.rs` (та же миграция, тот же ключ `voicechat-prefs`) |
-| Кастомный titlebar (`frame: false`) | `decorations: false` в `tauri.conf.json` + те же команды min/max/close |
+| Prefs + миграция | `tauri-plugin-store` + `prefs.rs` (ключ `voicechat-prefs`, дефолты — зеркало `apps/client/src/shared/prefs.ts`) |
+| Кастомный titlebar | `decorations: false` в `tauri.conf.json` + команды min/max/close |
 | Tray (Открыть / Выйти, hide-to-tray) | Встроенный `tray-icon` API Tauri 2 + `WindowEvent::CloseRequested` handler |
-| `electron-updater` (GitHub Releases) | `tauri-plugin-updater` (см. ниже про feed strategy) |
-| `dialog.showSaveDialog` + net.request | `tauri-plugin-dialog` + `reqwest` stream |
-| `desktopCapturer` + кастомный picker | **Системный picker WebView2** (см. ниже) |
+| Auto-update (GitHub Releases) | `tauri-plugin-updater` |
+| Скачивание файлов | `tauri-plugin-dialog` + `reqwest` stream |
+| Демонстрация экрана | **Системный picker WebView2** (см. ниже) |
 
 ## Известные ограничения
 
 ### Screen sharing — самая больная точка
 
-Electron-клиент перехватывает `getDisplayMedia()` через
-`session.setDisplayMediaRequestHandler` и подменяет picker на собственный
-React-диалог `ScreenSourcePicker.tsx`. **В Tauri 2 / WebView2 такого хука
-нет.**
-
-Текущая реализация — **best-effort fallback**:
-- `getDisplayMedia()` в `RoomView.tsx` вызывается напрямую и поднимает
-  встроенный системный picker WebView2.
-- Кастомный picker (`ScreenSourcePicker`) **не активируется** — Rust никогда
-  не эмитит `screen-share:request`, а `getScreenSources()` возвращает пустой
-  массив. UI рендерера это переживает: триггер для picker'а просто не
-  срабатывает.
-- Дальше поток идёт стандартно через LiveKit.
+`getDisplayMedia()` в `RoomView.tsx` вызывается напрямую и поднимает
+встроенный системный picker WebView2 — хука, чтобы подменить его своим
+диалогом, в WebView2 нет. Rust-команды `screen_get_sources` /
+`screen_share_respond` остались пустыми заглушками на случай нативного picker'а.
 
 **Что теряется**:
 - Свой UI выбора источника.
@@ -80,23 +70,12 @@ React-диалог `ScreenSourcePicker.tsx`. **В Tauri 2 / WebView2 таког�
   unsafe-кода, ручное управление Direct3D-текстурами, конвертация в I420 для
   кодировщика. Не в этом релизе.
 
-### Auto-update — отдельный feed
+### Auto-update
 
-Electron-клиент использует `electron-updater` с GitHub provider, который
-читает `latest.yml` рядом с релизными артефактами. Tauri имеет свой формат
-манифеста (`latest.json` со схемой `tauri-plugin-updater`), несовместимый с
-`latest.yml`.
-
-Решение: используем **отдельный endpoint** `latest-tauri.json` рядом с
-`latest.yml` в тех же GitHub Releases (см. `tauri.conf.json` →
-`plugins.updater.endpoints`). Это значит:
-- Один и тот же тег релиза несёт оба манифеста и оба набора артефактов
-  (NSIS-installer для Electron, MSI/NSIS для Tauri).
-- Каналы обновлений не пересекаются — пользователь Tauri-клиента не получит
-  предложение установить Electron-сборку и наоборот.
-- В CI workflow добавятся 2 новых шага: `tauri build` и публикация
-  `latest-tauri.json` (формат описан в документации
-  tauri-plugin-updater).
+Манифест — `latest.json` в формате `tauri-plugin-updater` рядом с
+артефактами GitHub Release (см. `tauri.conf.json` →
+`plugins.updater.endpoints`). Релиз собирает и публикует
+`.github/workflows/release-tauri.yml` по push тега `tauri-v*`.
 
 `pubkey` в `tauri.conf.json` сейчас — placeholder. Перед первым релизом
 выполнить `npx @tauri-apps/cli signer generate -w ~/.tauri/voicechat.key`,
@@ -104,9 +83,6 @@ Electron-клиент использует `electron-updater` с GitHub provider
 
 ### Прочие
 
-- `debug:open-internal-url` (упомянутый в задаче) **не реализован**, так как
-  его нет ни в `IPC` enum, ни в `window.api` Electron-версии. Если появится
-  — добавить как no-op команду с `log::info!`.
 - На macOS tray не создаётся (см. `tray.rs`) — стандартное dock-поведение.
 - Linux — best-effort: WebKitGTK поддерживает `getDisplayMedia` начиная с
   свежих версий, но требует pipewire portal.
@@ -115,14 +91,14 @@ Electron-клиент использует `electron-updater` с GitHub provider
 
 ```
 apps/client-tauri/
-├── index.html              # подкладывает preload-shim, грузит ../client renderer
+├── index.html              # грузит src/entry.ts
 ├── package.json
 ├── postcss.config.js       # локальный PostCSS — указывает на свой tailwind.config.ts
 ├── tailwind.config.ts      # наследует от ../client/tailwind.config.ts
 ├── tsconfig.json
 ├── vite.config.ts          # root=., alias '@' → ../client/src/renderer
 ├── scripts/
-│   └── generate-icons.mjs  # та же геометрия что у Electron-клиента
+│   └── generate-icons.mjs  # генерация иконок приложения
 └── src-tauri/
     ├── Cargo.toml
     ├── build.rs
@@ -132,7 +108,7 @@ apps/client-tauri/
     └── src/
         ├── main.rs         # точка входа, отключает консоль на Win release
         ├── lib.rs          # сборка Builder, plugins, window-events
-        ├── prefs.rs        # зеркало apps/client/src/main/prefs.ts
+        ├── prefs.rs        # зеркало apps/client/src/shared/prefs.ts
         ├── commands.rs     # все Tauri-команды (prefs/screen/update/file)
         ├── tray.rs         # system tray (Открыть / Выйти, hide-to-tray)
         ├── updater.rs      # auto-update + статусы для UpdateBanner

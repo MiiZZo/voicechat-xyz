@@ -1,8 +1,11 @@
 services:
   caddy:
     build:
-      context: .
-      dockerfile: Caddy.Dockerfile
+      # Корень репо — образ Caddy собирает и раздаёт веб-клиент (apps/client).
+      context: ..
+      dockerfile: deploy/Caddy.Dockerfile
+      args:
+        LOBBY_DOMAIN: ${LOBBY_DOMAIN}
     restart: unless-stopped
     ports:
       - "80:80"

@@ -161,3 +161,6 @@ window.__lkScreenWatch = (intervalMs = 1000) => {
 console.log(
   '[debug-bridge] помощники: window.__pcs, window.__lkScreenStats(), window.__lkScreenWatch()',
 );
+
+// Делает файл модулем — иначе `declare global` выше не компилируется.
+export {};

@@ -3,10 +3,12 @@ import { groupDevices, type DeviceList } from '../lib/devices.js';
 
 export type { DeviceList };
 
-export function useDeviceList(): DeviceList {
+/** `enabled=false` — не трогаем getUserMedia/enumerateDevices вовсе. */
+export function useDeviceList(enabled = true): DeviceList {
   const [list, setList] = useState<DeviceList>({ audioInputs: [], audioOutputs: [], videoInputs: [] });
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
 
     const enumerate = async () => {
@@ -34,7 +36,7 @@ export function useDeviceList(): DeviceList {
       cancelled = true;
       navigator.mediaDevices.removeEventListener('devicechange', onChange);
     };
-  }, []);
+  }, [enabled]);
 
   return list;
 }

@@ -1,18 +1,21 @@
 # VoiceChat
 
-Windows desktop voice/text chat with screen sharing for small rooms (up to 8 participants). Self-hosted: Electron client + Fastify lobby server + LiveKit SFU.
+Voice/text chat with screen sharing for small rooms (up to 8 participants). Self-hosted: Tauri desktop client + web client + Fastify lobby server + LiveKit SFU.
 
 See the [design spec](docs/superpowers/specs/2026-04-26-voicechat-design.md) and [implementation plan](docs/superpowers/plans/2026-04-26-voicechat-implementation.md) for architecture details.
 
 ## Stack
-- **Client:** Electron 31 + React 18 + Vite + Tailwind + shadcn/ui + LiveKit SDK
+- **Clients:** one React 18 + Vite + Tailwind + shadcn/ui + LiveKit SDK renderer (`apps/client/src/renderer`), shipped two ways:
+  - **Web** — `apps/client`, a static SPA served by Caddy from the lobby domain
+  - **Desktop** — `apps/client-tauri`, Tauri 2 (WebView2) with tray, global hotkeys and auto-update
+- Platform-specific bits go through the `window.api` contract (`apps/client/src/shared/api.ts`); desktop-only capabilities are optional and the UI hides what's missing.
 - **Lobby server:** Node 20 + Fastify + LiveKit Server SDK + zod + chokidar
 - **Media SFU:** LiveKit (self-hosted in Docker)
 - **Deploy:** docker-compose + Caddy (auto-HTTPS via Let's Encrypt) on a single VPS
 
 ## Local development
 
-Three things run together: LiveKit dev container, lobby server, Electron client.
+Three things run together: LiveKit dev container, lobby server, a client.
 
 **1. Start LiveKit dev container** (in a separate terminal):
 ```
@@ -28,9 +31,10 @@ cp .env.example .env  # only first time
 npm run dev -w @voicechat/server
 ```
 
-**3. Start Electron client**:
+**3. Start a client** — web (opens on http://localhost:5173) or Tauri:
 ```
-npm run dev -w @voicechat/client
+npm run dev:client          # web
+npm run dev:client-tauri    # desktop
 ```
 
 The client connects to the lobby on `http://localhost:3000` and to LiveKit on `ws://localhost:7880`.
@@ -38,7 +42,7 @@ The client connects to the lobby on `http://localhost:3000` and to LiveKit on `w
 ## Two-client smoke test
 
 To verify end-to-end media + chat:
-1. Run two `npm run dev:client` instances simultaneously
+1. Open the web client in two browser windows (or web + Tauri)
 2. Set distinct nicks in each window
 3. Join the same room (e.g. "Общая")
 4. Verify: both tiles appear, two-way audio works
@@ -48,13 +52,10 @@ To verify end-to-end media + chat:
 8. Try joining the same room from a third window with one of the existing nicks → server returns 409 (`duplicate_name`)
 9. Open settings, toggle noise suppression off, leave and rejoin — value persists across restart
 
-## Building a Windows installer
+## Releasing
 
-```
-npm run package -w @voicechat/client
-```
-
-Produces an NSIS installer at `apps/client/release/<version>/VoiceChat-<version>-Setup.exe`. Auto-update reads from GitHub Releases (configured in `apps/client/electron-builder.yml`).
+- **Desktop:** bump the version in `apps/client-tauri` (`package.json`, `src-tauri/Cargo.toml`, `Cargo.lock`, `tauri.conf.json`) and push a `tauri-v<version>` tag — `.github/workflows/release-tauri.yml` builds and publishes the release, clients pick it up via auto-update.
+- **Web:** rebuilt on deploy (`docker compose up -d --build` in `deploy/`), see below.
 
 ## Deployment
 

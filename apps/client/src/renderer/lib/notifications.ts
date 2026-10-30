@@ -2,25 +2,16 @@
 // не в фокусе (свёрнуто, в трее, на другом мониторе вне активного экрана) —
 // внутри окна уже виден чат, дублировать его раздражает.
 //
-// Реализация: window.api.notify (в Tauri-preload — emitTo('notification', ...)
-// → отдельное WebviewWindow с label 'notification' рендерит свой UI).
-// Web Notification API не используется: в WebView2 permission='denied'
-// без возможности grant. plugin-notification тоже не подходит — нужно
-// кастомный визуал в стиле приложения и стабильный click-focus без AUMID.
+// Реализация: window.api.notify. В Tauri — emitTo('notification', ...) →
+// отдельное WebviewWindow с label 'notification' рендерит свой UI (Web
+// Notification API в WebView2 не работает: permission='denied'). В браузере —
+// обычный Web Notification API.
 //
 // Анти-спам: cooldown на звук (общий + per-sender). Визуал тоста всегда
 // обновляется на последнее сообщение, чтобы не пропускать содержимое.
 
 import { useStore } from '../state/store.js';
 import { playNotify } from './sounds.js';
-
-import type { NotificationCorner } from '../../shared/types.js';
-
-type NotifyFn = (opts: {
-  title: string;
-  body: string;
-  corner?: NotificationCorner;
-}) => Promise<void>;
 
 // Не звенеть чаще раза в N мс — спасает от 5 пингов подряд, когда быстро
 // приходит несколько сообщений от разных людей.
@@ -55,9 +46,6 @@ export async function notifyChatMessage(opts: {
   // Master-switch из настроек. Сравнение строгое: undefined (prefs не
   // загружены) трактуем как "включено" — лучше показать тост, чем потерять.
   if (useStore.getState().prefs?.notificationsEnabled === false) return;
-  const notify = (window as { api?: { notify?: NotifyFn } }).api?.notify;
-  if (!notify) return;
-
   const now = Date.now();
   pruneStaleSenders(now);
   const sameSenderRecent =
@@ -75,5 +63,5 @@ export async function notifyChatMessage(opts: {
   // на разных экранах. 140 символов покрывают типичный чат без сюрпризов.
   const body = opts.body.length > 140 ? opts.body.slice(0, 140) + '…' : opts.body;
   const corner = useStore.getState().prefs?.notificationPosition;
-  await notify({ title: opts.fromName, body, corner });
+  await window.api.notify({ title: opts.fromName, body, corner });
 }

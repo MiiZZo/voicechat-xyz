@@ -4,9 +4,9 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Renderer источник — единая точка с Electron-клиентом, никакого дублирования.
-const electronClientRoot = resolve(__dirname, '../client');
-const rendererRoot = resolve(electronClientRoot, 'src/renderer');
+// Renderer источник — общий с веб-клиентом (apps/client), никакого дублирования.
+const sharedClientRoot = resolve(__dirname, '../client');
+const rendererRoot = resolve(sharedClientRoot, 'src/renderer');
 
 // Tauri запускает фронт на фиксированном порту; сетка совпадает с tauri.conf.json.
 const TAURI_DEV_PORT = 5174;
@@ -15,9 +15,9 @@ const TAURI_DEV_PORT = 5174;
 export default defineConfig(({ mode }) => {
   // Источник env: сначала свой .env в apps/client-tauri/ (если есть),
   // затем общие из apps/client/ — так оба клиента симметричны по умолчанию,
-  // но Tauri можно собирать на чистой машине без Electron-пакета.
+  // но Tauri можно собирать и без своего .env.
   const ownEnv = loadEnv(mode, __dirname, '');
-  const sharedEnv = loadEnv(mode, electronClientRoot, '');
+  const sharedEnv = loadEnv(mode, sharedClientRoot, '');
   const env = { ...sharedEnv, ...ownEnv };
 
   return {
@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react()],
     resolve: {
-      // Тот же alias `@` что в Electron-клиенте — иначе сломаются shadcn-импорты.
+      // Тот же alias `@` что в веб-клиенте — иначе сломаются shadcn-импорты.
       alias: { '@': rendererRoot },
     },
     // PostCSS/Tailwind берутся локально из ./postcss.config.js + ./tailwind.config.ts.
@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       // Vite по умолчанию не пускает за пределы workspace root'а; явно разрешаем
       // чтение из соседнего пакета — там лежит shared renderer.
-      fs: { allow: [__dirname, electronClientRoot] },
+      fs: { allow: [__dirname, sharedClientRoot] },
     },
     build: {
       outDir: 'dist',

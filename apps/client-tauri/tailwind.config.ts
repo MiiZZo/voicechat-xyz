@@ -1,4 +1,4 @@
-// Перенаправляем на конфиг Electron-клиента — токены/цвета/анимации одни.
+// Перенаправляем на конфиг общего renderer'а (apps/client) — токены/цвета/анимации одни.
 // Расширяем только список content-путей: добавляем собственный index.html и src/.
 import baseConfig from '../client/tailwind.config.js';
 import type { Config } from 'tailwindcss';

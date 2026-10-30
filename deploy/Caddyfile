@@ -6,7 +6,27 @@
     tls {
         dns cloudflare {env.CLOUDFLARE_API_TOKEN}
     }
-    reverse_proxy lobby:3000
+
+    # API лобби — всё под /api плюс healthcheck.
+    handle /api/* {
+        reverse_proxy lobby:3000
+    }
+    handle /healthz {
+        reverse_proxy lobby:3000
+    }
+
+    # Веб-клиент (SPA), собран в Caddy.Dockerfile.
+    handle {
+        root * /srv/web
+        # Ассеты с хэшем в имени — кэшируем навсегда; index.html — никогда,
+        # иначе после деплоя браузер продолжит грузить старый бандл.
+        @assets path /assets/*
+        header @assets Cache-Control "public, max-age=31536000, immutable"
+        @html not path /assets/*
+        header @html Cache-Control "no-cache"
+        try_files {path} /index.html
+        file_server
+    }
 }
 
 {$LIVEKIT_DOMAIN} {

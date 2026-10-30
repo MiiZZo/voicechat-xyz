@@ -8,8 +8,8 @@
 // Поэтому свёрнутое в трей приложение продолжает жечь GPU/CPU как активное.
 // Workaround — самим тротлить через class на <body>:
 //   - .vo-bg     ставится на window.blur (alt-tab в другое окно или игру)
-//   - .vo-hidden ставится дополнительно при window:visibility false из Rust
-//     (только когда окно реально hide()'нуто в трей)
+//   - .vo-hidden ставится дополнительно при visibilitychange=hidden, а в Tauri
+//     — по window:visibility false из Rust (см. apps/client-tauri/src/preload-shim.ts)
 // CSS-правила см. в index.css (блок «Velvet Onyx power-save»).
 
 const BG = 'vo-bg';
@@ -47,33 +47,6 @@ const init = (): void => {
   if (!document.hasFocus()) {
     document.body.classList.add(BG);
   }
-
-  // === Tauri-уровень: явный visibility-сигнал из Rust ===
-  // Чистый источник истины для «окно реально hide()'нуто в трей». Эмитится из
-  // lib.rs (CloseRequested → перед hide) и tray.rs (show_main_window → после show).
-  const isTauri = '__TAURI_INTERNALS__' in window;
-  if (!isTauri) return;
-
-  void (async (): Promise<void> => {
-    try {
-      const { listen } = await import('@tauri-apps/api/event');
-      await listen<boolean>('window:visibility', (e) => {
-        if (e.payload) {
-          // Окно показано (клик в трее). vo-bg снимется через focus-event,
-          // который прилетит после set_focus().
-          document.body.classList.remove(HIDDEN);
-        } else {
-          // Окно сейчас будет скрыто. Ставим оба класса синхронно, чтобы
-          // следующий же кадр composition'а уже не имел тяжёлых слоёв.
-          document.body.classList.add(BG);
-          document.body.classList.add(HIDDEN);
-        }
-      });
-    } catch {
-      // Если Tauri API не загрузился — DOM-events продолжают работать,
-      // просто не будет дополнительного vo-hidden при hide-to-tray.
-    }
-  })();
 };
 
 // body может быть ещё не доступен в момент выполнения этого модуля при

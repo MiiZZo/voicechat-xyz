@@ -16,19 +16,19 @@ type State = { error: Error | null };
  * только это поддерево на fallback.
  */
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null };
+  override state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
     return { error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(`[${this.props.label}] render crashed`, error, info.componentStack);
   }
 
   reset = () => this.setState({ error: null });
 
-  render() {
+  override render() {
     if (this.state.error) return this.props.fallback(this.state.error, this.reset);
     return this.props.children;
   }
