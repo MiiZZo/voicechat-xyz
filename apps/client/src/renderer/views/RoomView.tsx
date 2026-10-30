@@ -44,6 +44,9 @@ export function RoomView() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [screenShareParticipant, setScreenShareParticipant] = useState<Participant | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Узкий экран: чат свёрнут в шторку, открывается кнопкой в доке.
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(false);
   // Цикл мониторинга здоровья скриншер-капчи. Живёт ровно сколько идёт
   // публикация, чтобы не дёргать getStats() впустую вне сессии шеры.
   const shareMonitorRef = useRef<(() => void) | null>(null);
@@ -71,6 +74,23 @@ export function RoomView() {
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
+
+  // Мобильные браузеры (особенно Safari на iOS) могут заблокировать
+  // автовоспроизведение входящего звука — тогда включаем его по первому тапу.
+  useEffect(() => {
+    if (!room) return;
+    const unlock = () => void room.startAudio().catch(() => undefined);
+    const onStatus = () => {
+      if (room.canPlaybackAudio) return;
+      window.addEventListener('pointerdown', unlock, { once: true });
+    };
+    room.on(RoomEvent.AudioPlaybackStatusChanged, onStatus);
+    onStatus();
+    return () => {
+      room.off(RoomEvent.AudioPlaybackStatusChanged, onStatus);
+      window.removeEventListener('pointerdown', unlock);
+    };
+  }, [room]);
 
   useEffect(() => {
     if (!room) return;
@@ -280,7 +300,7 @@ export function RoomView() {
   };
 
   return (
-    <div className="relative z-[1] flex h-screen flex-col text-fg">
+    <div className="relative z-[1] flex h-dvh flex-col text-fg">
       {/* Velvet Onyx: vertical rim halo along the chat panel's left edge.
          Portal'ed into <body> so it's a sibling of #root and sits in body's
          stacking context (above body bg + body::before drift halo, below .app).
@@ -321,7 +341,7 @@ export function RoomView() {
               </TooltipContent>
             </Tooltip>
           )}
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-subtle">
+          <span className="hidden font-mono text-[10px] uppercase tracking-[0.2em] text-fg-subtle sm:inline">
             {state}
           </span>
         </div>
@@ -331,7 +351,7 @@ export function RoomView() {
         {/* Bottom padding clears the floating ControlBar (~52px high + 18px gap). */}
         <section
           className={cn(
-            'flex-1 p-5 pb-[88px]',
+            'min-w-0 flex-1 p-3 pb-[84px] md:p-5 md:pb-[88px]',
             // Screen-share scene: contained flex-col layout — big tile fills the
             // remaining height, strip stays at its fixed height. No vertical
             // scroll appears even at fullscreen with many participants.
@@ -356,7 +376,7 @@ export function RoomView() {
               {/* Participants strip — fixed-height horizontal scroll, mirrors
                   mockup .ss-strip. Sharer is included as their camera tile so
                   the strip is the canonical list of who's in the room. */}
-              <div className="flex h-[110px] shrink-0 gap-2.5 overflow-x-auto pb-1">
+              <div className="flex h-[88px] shrink-0 gap-2.5 overflow-x-auto pb-1 md:h-[110px]">
                 {participants.map((p) => (
                   <div key={p.identity} className="aspect-[4/3] h-full shrink-0">
                     <ParticipantTile
@@ -370,7 +390,7 @@ export function RoomView() {
               </div>
             </>
           ) : (
-            <div className="grid grid-cols-3 gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:grid-cols-4">
               {participants.map((p) => (
                 <ParticipantTile
                   key={p.identity}
@@ -384,7 +404,17 @@ export function RoomView() {
         </section>
         {room && (
           <div className={isFullscreen ? 'hidden' : 'contents'}>
-            <ChatPanel room={room} />
+            <ChatPanel
+              room={room}
+              mobileOpen={chatOpen}
+              onMobileClose={() => setChatOpen(false)}
+              onIncoming={() => {
+                // На десктопе чат и так на экране — бейдж не нужен.
+                if (!chatOpen && window.matchMedia('(max-width: 767px)').matches) {
+                  setChatUnread(true);
+                }
+              }}
+            />
           </div>
         )}
 
@@ -398,6 +428,11 @@ export function RoomView() {
             micActivationMode={prefs?.micActivationMode ?? 'always'}
             pttHeld={pttHeld}
             vadOpen={vadOpen}
+            onOpenChat={() => {
+              setChatOpen(true);
+              setChatUnread(false);
+            }}
+            chatUnread={chatUnread}
           />
         )}
       </main>

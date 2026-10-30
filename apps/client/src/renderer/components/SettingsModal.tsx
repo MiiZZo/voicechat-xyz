@@ -18,6 +18,7 @@ import { useDeviceList } from '../hooks/useDeviceList.js';
 import { useMicLevelMeter } from '../hooks/useMicLevelMeter.js';
 import { playTestSignal } from '../lib/sounds.js';
 import { accelFromKeyEvent, prettyAccel } from '../lib/accel-key.js';
+import { canSelectAudioOutput, canShareScreen } from '../lib/platform.js';
 import type {
   MicActivationMode,
   NotificationCorner,
@@ -82,10 +83,13 @@ export function SettingsModal({ open, onOpenChange }: Props) {
   const devices = useDeviceList(open);
   const [capturing, setCapturing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('devices');
-  // Глобальных хоткеев и трея в браузере нет — прячем их настройки.
+  // Глобальных хоткеев и трея в браузере нет — прячем их настройки. В
+  // мобильном браузере нет и демонстрации экрана.
   const hasGlobalShortcuts = !!window.api.setGlobalShortcuts;
   const hasWindow = !!window.api.window;
-  const tabs = TABS.filter((t) => t.id !== 'hotkeys' || hasGlobalShortcuts);
+  const tabs = TABS.filter(
+    (t) => (t.id !== 'hotkeys' || hasGlobalShortcuts) && (t.id !== 'screen' || canShareScreen),
+  );
 
   if (!prefs) return null;
 
@@ -139,7 +143,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
           width: 880,
           height: 640,
           maxWidth: 'calc(100vw - 2rem)',
-          maxHeight: 'calc(100vh - 2rem)',
+          maxHeight: 'calc(100dvh - 2rem)',
           padding: 0,
           gap: 0,
         }}
@@ -157,10 +161,11 @@ export function SettingsModal({ open, onOpenChange }: Props) {
           <HeaderVersionBadge />
         </header>
 
-        <div className="flex h-full min-h-0 flex-1">
-          {/* Sidebar — section nav only (title moved to modal header above). */}
-          <aside className="flex w-[200px] shrink-0 flex-col border-r border-white/[0.05] bg-black/20 pt-3.5">
-            <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 pb-3">
+        <div className="flex h-full min-h-0 flex-1 flex-col md:flex-row">
+          {/* Sidebar — section nav only (title moved to modal header above).
+              На узком экране — горизонтальная лента табов над контентом. */}
+          <aside className="flex shrink-0 flex-col border-b border-white/[0.05] bg-black/20 md:w-[200px] md:border-b-0 md:border-r md:pt-3.5">
+            <nav className="flex gap-0.5 overflow-x-auto px-2.5 py-2 md:flex-1 md:flex-col md:overflow-y-auto md:py-0 md:pb-3">
               {tabs.map((tab) => (
                 <TabButton
                   key={tab.id}
@@ -170,7 +175,9 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                 />
               ))}
             </nav>
-            <AppFooter />
+            <div className="hidden md:block">
+              <AppFooter />
+            </div>
           </aside>
 
           {/* Content — скроллится внутри. key даёт лёгкую fade-in анимацию
@@ -178,7 +185,7 @@ export function SettingsModal({ open, onOpenChange }: Props) {
           <main className="flex-1 overflow-y-auto">
             <div
               key={activeTab}
-              className="animate-in fade-in-0 slide-in-from-bottom-1.5 duration-[250ms] px-8 pb-8 pt-7"
+              className="animate-in fade-in-0 slide-in-from-bottom-1.5 duration-[250ms] px-4 pb-6 pt-5 md:px-8 md:pb-8 md:pt-7"
             >
               <ContentHeader tab={current} />
               {/* Ошибка рендера раздела не должна ронять всё приложение
@@ -204,13 +211,27 @@ export function SettingsModal({ open, onOpenChange }: Props) {
                         value={prefs.videoInputDeviceId}
                         onChange={(v) => update({ videoInputDeviceId: v })}
                       />
-                      <DeviceField
-                        label="Динамики"
-                        devices={devices.audioOutputs}
-                        value={prefs.audioOutputDeviceId}
-                        onChange={(v) => update({ audioOutputDeviceId: v })}
-                        action={<SpeakerTestButton deviceId={prefs.audioOutputDeviceId} />}
-                      />
+                      {canSelectAudioOutput ? (
+                        <DeviceField
+                          label="Динамики"
+                          devices={devices.audioOutputs}
+                          value={prefs.audioOutputDeviceId}
+                          onChange={(v) => update({ audioOutputDeviceId: v })}
+                          action={<SpeakerTestButton deviceId={prefs.audioOutputDeviceId} />}
+                        />
+                      ) : (
+                        // Мобильные браузеры не дают выбрать выход (нет
+                        // setSinkId) — звук ведёт ОС, список был бы фикцией.
+                        <div className="flex items-center justify-between gap-6 border-b border-white/[0.05] py-4 last:border-b-0">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className="text-[13px] font-medium text-fg">Динамики</span>
+                            <span className="text-[12px] leading-[1.5] text-fg-subtle">
+                              Выход выбирает система: подключите наушники — звук пойдёт в них.
+                            </span>
+                          </div>
+                          <SpeakerTestButton deviceId={null} />
+                        </div>
+                      )}
                     </>
                   )}
 
@@ -443,7 +464,7 @@ function TabButton({
       className={cn(
         // Match mockup .nav-item — no left accent bar, just bg + border + inset
         // highlight on active.
-        'flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-[13px] font-medium leading-none transition-all',
+        'flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-[13px] font-medium leading-none transition-all',
         active
           ? 'border border-white/[0.08] bg-white/[0.06] text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_14px_-8px_rgba(0,0,0,0.4)]'
           : 'border border-transparent text-fg-muted hover:bg-white/[0.04] hover:text-fg',
@@ -1198,19 +1219,19 @@ function DeviceField({
   const SENTINEL = '__default__';
   // Velvet Onyx: mset-row pattern — name+desc left, control right, hairline border-bottom.
   return (
-    <div className="flex items-center justify-between gap-6 border-b border-white/[0.05] py-4 last:border-b-0">
+    <div className="flex flex-col gap-3 border-b border-white/[0.05] py-4 last:border-b-0 md:flex-row md:items-center md:justify-between md:gap-6">
       <div className="flex min-w-0 flex-col gap-1">
         <span className="text-[13px] font-medium text-fg">{label}</span>
         {desc && (
           <span className="text-[12px] leading-[1.5] text-fg-subtle">{desc}</span>
         )}
       </div>
-      <div className="flex shrink-0 items-stretch gap-2">
+      <div className="flex min-w-0 items-stretch gap-2 md:shrink-0">
         <Select
           value={value ?? SENTINEL}
           onValueChange={(v) => onChange(v === SENTINEL ? null : v)}
         >
-          <SelectTrigger className="w-[220px]">
+          <SelectTrigger className="min-w-0 flex-1 md:w-[220px] md:flex-none">
             <SelectValue placeholder="По умолчанию" />
           </SelectTrigger>
           <SelectContent>

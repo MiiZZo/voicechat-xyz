@@ -57,7 +57,7 @@ export function LobbyView() {
   return (
     // relative z-[1] поднимает контент над body::before halo (z 0) — тот же
     // трюк, что в RoomView. text-fg без bg-bg — фон даёт body + halo'ы.
-    <div className="relative z-[1] flex h-screen flex-col text-fg">
+    <div className="relative z-[1] flex h-dvh flex-col text-fg">
       <TitleBar>
         <span className="text-sm font-semibold tracking-tight">VoiceChat</span>
         <span className="ml-auto" />

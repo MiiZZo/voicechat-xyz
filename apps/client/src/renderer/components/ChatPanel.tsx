@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type DragEvent } from 'react';
 import { RoomEvent, type Room, type RemoteParticipant } from 'livekit-client';
-import { ArrowUp, Copy, ClipboardCopy, Paperclip, Download, Loader2, AlertCircle, X, File as FileIcon, Upload, Search } from 'lucide-react';
+import { ArrowUp, Copy, ClipboardCopy, Paperclip, Download, Loader2, AlertCircle, X, File as FileIcon, Upload, Search, ChevronDown } from 'lucide-react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { useStore, type ChatMessage, type FileMessage } from '../state/store.js';
 import { Avatar, AvatarFallback, AvatarImage, avatarColor, customAvatar } from './ui/avatar.js';
@@ -145,13 +145,27 @@ function highlightNodes(nodes: ReactNode[], term?: string): ReactNode[] {
   });
 }
 
-export function ChatPanel({ room }: { room: Room }) {
+type ChatPanelProps = {
+  room: Room;
+  /** Узкий экран: чат — полноэкранная шторка поверх сцены, открытая по кнопке
+   *  в доке. На десктопе флаг игнорируется, панель всегда видна. */
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+  /** Входящее сообщение от другого участника — для бейджа непрочитанного. */
+  onIncoming?: () => void;
+};
+
+export function ChatPanel({ room, mobileOpen, onMobileClose, onIncoming }: ChatPanelProps) {
   const { chat, pushChat, patchChat, seedHistory, activeRoom } = useStore();
   const [text, setText] = useState('');
   const [isDragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  // Ref, чтобы подписка на DataReceived не пересоздавалась на каждый рендер
+  // родителя (onIncoming — инлайновая стрелка).
+  const onIncomingRef = useRef(onIncoming);
+  onIncomingRef.current = onIncoming;
   const { push: pushToast } = useToasts();
 
   // --- Search / filters (ephemeral UI state — resets on close and on room
@@ -205,6 +219,7 @@ export function ChatPanel({ room }: { room: Room }) {
           // Системное уведомление — само решит, показывать ли (только если
           // окно вне фокуса) и спросит permission при первом вызове.
           void notifyChatMessage({ fromName, body: msg.text });
+          onIncomingRef.current?.();
         } else if (msg.type === 'file') {
           pushChat({
             kind: 'file',
@@ -220,6 +235,7 @@ export function ChatPanel({ room }: { room: Room }) {
             status: 'done',
           });
           void notifyChatMessage({ fromName, body: `📎 ${msg.name}` });
+          onIncomingRef.current?.();
         }
       } catch {
         /* ignore */
@@ -235,7 +251,9 @@ export function ChatPanel({ room }: { room: Room }) {
     // Don't yank the view while the user is scanning filtered results.
     if (active) return;
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [chat.length, chat, active]);
+    // mobileOpen: пока шторка скрыта (display:none), scrollHeight = 0 и
+    // прокрутка не срабатывает — догоняем низ при открытии.
+  }, [chat.length, chat, active, mobileOpen]);
 
   // Load persisted room history on entering a room. Best-effort: a failure
   // leaves the chat empty rather than blocking. seedHistory merges with any
@@ -415,13 +433,24 @@ export function ChatPanel({ room }: { room: Room }) {
 
   return (
     <aside
-      className="vo-chat-bg vo-chat-rim relative flex w-80 flex-col"
+      className={cn(
+        'vo-chat-bg vo-chat-rim flex-col md:relative md:flex md:w-[var(--chat-w)] md:shrink-0',
+        mobileOpen ? 'absolute inset-0 z-[8] flex max-md:bg-bg' : 'hidden',
+      )}
       onDragEnter={onDragEnter}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
       <div className="relative flex items-center justify-center px-4 py-3.5 after:absolute after:bottom-0 after:left-5 after:right-5 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/10 after:to-transparent after:content-['']">
+        <button
+          type="button"
+          aria-label="Свернуть чат"
+          onClick={onMobileClose}
+          className="absolute left-3 flex h-7 w-7 items-center justify-center rounded-full text-fg-muted transition-colors hover:bg-white/[0.06] hover:text-fg focus:outline-none md:hidden"
+        >
+          <ChevronDown size={16} strokeWidth={2.25} />
+        </button>
         <span className="text-sm font-semibold tracking-tight text-fg">Чат</span>
         <button
           type="button"

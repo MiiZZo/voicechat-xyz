@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { RoomEvent, Track, type Room } from 'livekit-client';
-import { Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff, Settings } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff, Settings, MessageSquare } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import type { MicActivationMode } from '../../shared/types.js';
 import { useStore } from '../state/store.js';
 import { onToggleMute } from '../lib/app-actions.js';
+import { canShareScreen } from '../lib/platform.js';
 import { Button } from './ui/button.js';
 import { Separator } from './ui/separator.js';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip.js';
@@ -18,6 +19,9 @@ type Props = {
   micActivationMode: MicActivationMode;
   pttHeld: boolean;
   vadOpen: boolean;
+  /** Кнопка чата — только на узком экране, где чат свёрнут в шторку. */
+  onOpenChat: () => void;
+  chatUnread: boolean;
 };
 
 export function ControlBar({
@@ -29,6 +33,8 @@ export function ControlBar({
   micActivationMode,
   pttHeld,
   vadOpen,
+  onOpenChat,
+  chatUnread,
 }: Props) {
   const [, force] = useState(0);
 
@@ -127,19 +133,32 @@ export function ControlBar({
           onClick={toggleCam}
           mutedStyle={!camOn}
         />
-        <ToolButton
-          label={
-            localSharing
-              ? 'Остановить демонстрацию'
-              : remoteSharing
-                ? 'Уже идёт демонстрация'
-                : 'Демонстрация экрана'
-          }
-          active={localSharing}
-          disabled={!localSharing && remoteSharing}
-          icon={localSharing ? <MonitorX /> : <MonitorUp />}
-          onClick={onToggleScreenShare}
-        />
+        {canShareScreen && (
+          <ToolButton
+            label={
+              localSharing
+                ? 'Остановить демонстрацию'
+                : remoteSharing
+                  ? 'Уже идёт демонстрация'
+                  : 'Демонстрация экрана'
+            }
+            active={localSharing}
+            disabled={!localSharing && remoteSharing}
+            icon={localSharing ? <MonitorX /> : <MonitorUp />}
+            onClick={onToggleScreenShare}
+          />
+        )}
+        <div className="relative md:hidden">
+          <ToolButton
+            label={chatUnread ? 'Чат — есть новые сообщения' : 'Чат'}
+            active={false}
+            icon={<MessageSquare />}
+            onClick={onOpenChat}
+          />
+          {chatUnread && (
+            <span className="pointer-events-none absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-400" />
+          )}
+        </div>
         <ToolButton
           label="Настройки"
           active={false}
@@ -151,9 +170,15 @@ export function ControlBar({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="destructive" size="sm" onClick={onLeave} className="h-10 gap-2 rounded-full px-4">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={onLeave}
+              aria-label="Покинуть комнату"
+              className="h-10 gap-2 rounded-full px-3 sm:px-4"
+            >
               <PhoneOff />
-              <span>Выйти</span>
+              <span className="hidden sm:inline">Выйти</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>Покинуть комнату</TooltipContent>

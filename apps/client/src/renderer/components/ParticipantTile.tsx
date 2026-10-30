@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage, avatarColor, customAvatar } from '
 import { ParticipantContextMenu } from './ParticipantContextMenu.js';
 import { ScreenShareOverlay } from './ScreenShareOverlay.js';
 import { QualityIndicator } from './QualityIndicator.js';
+import { canSelectAudioOutput } from '../lib/platform.js';
 
 type Props = {
   p: Participant;
@@ -141,23 +142,26 @@ export function ParticipantTile({ p, big = false, fill = false, videoSource = Tr
     if (!track || !el) return;
 
     track.attach(el);
-    el.muted = true;
-    el.volume = 0;
 
     let ctx = audioCtxRef.current;
-    if (!ctx) {
+    if (!ctx && canSelectAudioOutput) {
       try {
         ctx = new AudioContext();
         audioCtxRef.current = ctx;
       } catch {
         // Web Audio unavailable — fall back to <audio> element.
-        el.muted = false;
-        el.volume = 1;
-        return () => {
-          track.detach(el);
-        };
       }
     }
+    if (!ctx) {
+      // Мобильный браузер или нет Web Audio: звук играет сам <audio>, ОС
+      // сама ведёт его в наушники. Громкость/mute накатит volume-эффект.
+      setAudioGraphTick((n) => n + 1);
+      return () => {
+        track.detach(el);
+      };
+    }
+    el.muted = true;
+    el.volume = 0;
 
     let gain = gainNodeRef.current;
     if (!gain) {
@@ -231,23 +235,25 @@ export function ParticipantTile({ p, big = false, fill = false, videoSource = Tr
     if (!track || !el) return;
 
     track.attach(el);
-    el.muted = true;
-    el.volume = 0;
 
     let ctx = screenAudioCtxRef.current;
-    if (!ctx) {
+    if (!ctx && canSelectAudioOutput) {
       try {
         ctx = new AudioContext();
         screenAudioCtxRef.current = ctx;
       } catch {
         // Web Audio недоступен — fallback на нативный <audio>.
-        el.muted = false;
-        el.volume = 1;
-        return () => {
-          track.detach(el);
-        };
       }
     }
+    if (!ctx) {
+      // См. микрофонный эффект: играет сам <audio>, громкость — через tick.
+      setScreenAudioGraphTick((n) => n + 1);
+      return () => {
+        track.detach(el);
+      };
+    }
+    el.muted = true;
+    el.volume = 0;
 
     let gain = screenGainNodeRef.current;
     if (!gain) {

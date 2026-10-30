@@ -93,9 +93,10 @@
     50%      { opacity: 1.00; }
   }
 
-  /* Responsive chat width — keep in sync with .chat width in components below. */
+  /* Responsive chat width — ChatPanel берёт ширину прямо из --chat-w. */
   @media (max-width: 900px) { :root { --chat-w: 280px; } }
-  @media (max-width: 680px) { :root { --chat-w: 0px; } }
+  /* < md: чат — полноэкранная шторка (см. ChatPanel), сцена во всю ширину. */
+  @media (max-width: 767px) { :root { --chat-w: 0px; } }
 
   ::selection { background: hsl(0 0% 100% / 0.18); color: hsl(0 0% 98%); }
 
